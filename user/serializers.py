@@ -26,7 +26,7 @@ class FriendRequestSerializers(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FriendsSerializers(serializers.ModelSerializer):
+class FriendsAndBlockedSerializers(serializers.ModelSerializer):
     friends = SimpleUserSerializers(many=True, read_only=True)
     blocked = SimpleUserSerializers(many=True, read_only=True)
     friendRequest = FriendRequestSerializers(many=True, read_only=True)

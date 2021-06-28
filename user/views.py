@@ -1,4 +1,4 @@
-from .serializers import UserSerializers, FriendsSerializers, SimpleUserSerializers, FriendRequestSerializers
+from .serializers import UserSerializers, FriendsAndBlockedSerializers, SimpleUserSerializers, FriendRequestSerializers
 from .models import User, FriendRequest
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -115,37 +115,27 @@ class MyInfo(APIView):
                 return Response({'error': 'Data is invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# admin and owner can GET and DELETE
-# todo: Admin or Owner permission
-class AdminOrOwnerPermission(permissions.BasePermission):
-    def has_permission(self, request, view):
-        pass
-
-
-class FriendsViewSet(viewsets.ViewSet):
+class FriendsAndBlockedViewSet(viewsets.ViewSet):
     queryset = User.objects.all()
-    permission_class = [IsAuthenticated, AdminOrOwnerPermission]
+    permission_class = [IsAuthenticated]
 
     def list(self, request):
         user = request.user
-        serializer = FriendsSerializers(user)
+        serializer = FriendsAndBlockedSerializers(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def retrieve(self, request, pk=None):
-        # todo: delete or block friends
-        pass
-        friends = request.user.friends
-        if friends:
-            serializer = UserSerializers(friends)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(status=status.HTTP_404_NOT_FOUND)
+    def destroy(self, request, pk=None):
+        user = request.user
+        friend = get_object_or_404(user.friends.all(), pk=pk)
+        user.friends.remove(friend)
+        friend.friends.remove(user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CreateFriendsRequest(APIView):
     queryset = FriendRequest.objects.all()
     permission_classes = [IsAuthenticated]
 
-    # todo: blocked filter
     def post(self, request, pk=None):
         user = request.user
         # try to get message for friend request
@@ -157,27 +147,32 @@ class CreateFriendsRequest(APIView):
         if user.id == pk:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         toUser = get_object_or_404(User.objects.all(), pk=pk)
-        # user can't make friend request to their friends
         try:
-            user.friends.get(pk=toUser.id)
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            toUser.blocked.get(pk=user.id)
+            return Response({'error': 'Blocked'}, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
-            # user can't spam friends request
-            requestMade = FriendRequest.objects.filter(fromUser=user, toUser=toUser)
-            if requestMade:
-                # if user already made friends request, return the request user made before
-                return Response(FriendRequestSerializers(requestMade[0]).data, status=status.HTTP_400_BAD_REQUEST)
-            requestCreated = FriendRequest.objects.create(toUser=toUser, fromUser=user, message=message)
-            serializer = FriendRequestSerializers(requestCreated)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # user can't make friend request to their friends
+            try:
+                user.friends.get(pk=toUser.id)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                # user can't spam friends request
+                requestMade = FriendRequest.objects.filter(fromUser=user, toUser=toUser)
+                if requestMade:
+                    # if user already made friends request, return the request user made before
+                    return Response(FriendRequestSerializers(requestMade[0]).data, status=status.HTTP_400_BAD_REQUEST)
+                requestCreated = FriendRequest.objects.create(toUser=toUser, fromUser=user, message=message)
+                serializer = FriendRequestSerializers(requestCreated)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 # admin and the user who is being requested have permission to reply
-# admin and the user who create request have permission to delete
+# admin and the user who create request have permission to DELETE
+# both user can GET the friend request
 class AdminOrBeingRequestedOrOwnerPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return (request.method in permissions.SAFE_METHODS and (
-                request.user == obj.toUser or request.user == obj.fromUser)) or (
+                request.user == obj.toUser or not request.query_params and request.user == obj.fromUser)) or (
                        request.method == 'DELETE' and request.user == obj.fromUser) or request.user.is_superuser
 
 
@@ -208,6 +203,25 @@ class FriendRequestReplyOrCancel(APIView):
         self.check_object_permissions(self.request, friendRequest)
         friendRequest.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BlockOrUnBlockUser(APIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk=None):
+        user = request.user
+        blockedUser = get_object_or_404(self.queryset, pk=pk)
+        user.friends.remove(blockedUser)
+        blockedUser.friends.remove(user)
+        user.blocked.add(blockedUser)
+        return Response(status=status.HTTP_200_OK)
+
+    def delete(self, request, pk=None):
+        user = request.user
+        blockedUser = get_object_or_404(user.blocked.all(), pk=pk)
+        user.blocked.remove(blockedUser)
+        return Response(status=status.HTTP_200_OK)
 
 
 class CreateUser(APIView):
