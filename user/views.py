@@ -41,19 +41,12 @@ def email_check(email):
     return bool(re.search(regex, email))
 
 
-# admin or read only permission
-class IsAdminOrReadOnlyPermissions(permissions.BasePermission):
-
-    def has_permission(self, request, view):
-        return request.user.is_superuser or request.method in permissions.SAFE_METHODS
-
-
 # User ViewSet
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(viewsets.ViewSet):
     queryset = User.objects.all()
-    serializer_class = UserSerializers
-    permission_classes = [IsAdminOrReadOnlyPermissions]
+    permission_classes = [IsAuthenticated]
 
+    # todo: max result return and multiple page
     def list(self, request):
         # show more info if user is admin
         if request.user.is_superuser:
