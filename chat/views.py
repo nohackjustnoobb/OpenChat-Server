@@ -31,6 +31,15 @@ class GroupViewSets(viewsets.ViewSet):
             serializer = SimpleGroupSerializers(group)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def destroy(self, request, pk=None):
+        user = request.user
+        group = get_object_or_404(self.queryset, pk=pk)
+        if group.owner == user or user.is_superuser:
+            group.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "You do not have permission to perform this action."},
+                        status=status.HTTP_403_FORBIDDEN)
+
 
 class CreateGroup(APIView):
     permission_classes = [IsAuthenticated]
@@ -43,7 +52,7 @@ class CreateGroup(APIView):
             avatar = request.data.get('avatar')
             members = request.data['members']
 
-            if len(members) == 0 or type(members) != list or owner.id in members:
+            if not len(members) or type(members) != list or owner.id in members or not len(groupName):
                 raise KeyError
             else:
                 membersLists = User.objects.filter(pk__in=members)
