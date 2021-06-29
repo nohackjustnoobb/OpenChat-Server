@@ -17,6 +17,13 @@ def maxImageSize(value):
         raise ValidationError('Image too large. Size should not exceed 10 MiB.')
 
 
+# max Avatar Size is 20MB
+def maxAvatarSize(value):
+    limit = 10 * 1024 * 1024
+    if value.size > limit:
+        raise ValidationError('Image too large. Size should not exceed 20 MiB.')
+
+
 class Group(models.Model):
     createDate = models.DateField(auto_now_add=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
@@ -26,6 +33,7 @@ class Group(models.Model):
     description = models.TextField(max_length=500, blank=True)
     groupAdmin = models.ManyToManyField(User, related_name='groupAdmin')
     pinnedMessage = models.ManyToManyField('Message', blank=True)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
 
     def __str__(self):
         return f'#{self.id} {self.groupName}'
@@ -40,6 +48,7 @@ class Message(models.Model):
     additionImage = models.ImageField(upload_to='images/', blank=True, validators=[maxImageSize])
     MemberRead = models.ImageField(default=0)
     deleted = models.BooleanField(default=False)
+    relyTo = models.ForeignKey('Message', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
         return f'Message from {self.owner.username}'
