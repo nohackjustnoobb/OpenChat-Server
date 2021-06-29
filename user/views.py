@@ -183,6 +183,7 @@ class FriendRequestReplyOrCancel(APIView):
     def get(self, request, pk=None):
         friendRequest = get_object_or_404(self.queryset, pk=pk)
         self.check_object_permissions(self.request, friendRequest)
+        # try to get reply
         try:
             reply = request.query_params['reply']
             if reply == 'accept':
@@ -195,6 +196,7 @@ class FriendRequestReplyOrCancel(APIView):
             friendRequest.delete()
             return Response(status=status.HTTP_202_ACCEPTED)
         except KeyError:
+            # if there are not query params return the request
             serializer = FriendRequestSerializers(friendRequest)
             return Response(serializer.data, status=status.HTTP_200_OK)
 

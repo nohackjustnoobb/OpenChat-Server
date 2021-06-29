@@ -1,13 +1,10 @@
-from rest_framework import routers
-from django.urls import path, include
-from .views import UserViewSet, MyInfo, CreateUser, FriendsAndBlockedViewSet, CreateFriendsRequest, FriendRequestReplyOrCancel, \
-    BlockOrUnBlockUser
-
-router = routers.DefaultRouter()
-router.register(r'info', UserViewSet)
+from django.urls import path
+from .views import UserViewSet, MyInfo, CreateUser, FriendsAndBlockedViewSet, CreateFriendsRequest, \
+    FriendRequestReplyOrCancel, BlockOrUnBlockUser
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', UserViewSet.as_view({'get': 'list'})),
+    path('<int:pk>/', UserViewSet.as_view({'get': 'retrieve'})),
     path('create/', CreateUser.as_view()),
     path('me/', MyInfo.as_view()),
     path('me/friends/', FriendsAndBlockedViewSet.as_view({'get': 'list'})),
