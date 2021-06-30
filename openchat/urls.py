@@ -18,6 +18,6 @@ from rest_framework.authtoken import views
 
 urlpatterns = [
     path('groups/', include('chat.urls')),
-    path('user/', include('user.urls')),
+    path('users/', include('user.urls')),
     path('token/', views.obtain_auth_token)
 ]

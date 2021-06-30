@@ -30,7 +30,7 @@ class MessageSerializers(serializers.ModelSerializer):
 class GroupSerializers(serializers.ModelSerializer):
     owner = SimpleUserSerializers()
     members = SimpleUserSerializers(many=True, read_only=True)
-    groupAdmin = SimpleUserSerializers(many=True, read_only=True)
+    groupAdmins = SimpleUserSerializers(many=True, read_only=True)
 
     class Meta:
         model = Group

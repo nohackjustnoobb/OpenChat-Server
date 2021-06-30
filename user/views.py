@@ -223,23 +223,31 @@ class CreateUser(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, format=None):
-        username = request.data['username']
-        email = request.data['email']
-        password = request.data['password']
-        if not (username and email and password):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        password_check_result = password_check(password)
-        # check username and email is not registered
         try:
-            User.objects.get(username=username)
-            User.objects.get(email=email)
-            return Response({'error': 'This email or username was took by other user'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        except User.DoesNotExist:
-            if not password_check_result[0]:
-                return Response({'error': password_check_result[1]}, status=status.HTTP_400_BAD_REQUEST)
-            elif not email_check(email):
-                return Response({'error': 'This email is invalid'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                user = User.objects.create_user(username, email, password)
-                return Response(UserSerializers(user).data, status=status.HTTP_201_CREATED)
+            username = request.data['username']
+            email = request.data['email']
+            password = request.data['password']
+            if not (username and email and password):
+                return Response({'error': 'Username, password or email can\'t be empty'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            password_check_result = password_check(password)
+            # check username and email is not registered
+            try:
+                User.objects.get(username=username)
+                return Response({'error': 'This username was took by other user'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                try:
+                    User.objects.get(email=email)
+                    return Response({'error': 'This email was took by other user'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                except User.DoesNotExist:
+                    if not password_check_result[0]:
+                        return Response({'error': password_check_result[1]}, status=status.HTTP_400_BAD_REQUEST)
+                    elif not email_check(email):
+                        return Response({'error': 'This email is invalid'}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        user = User.objects.create_user(username, email, password)
+                        return Response(UserSerializers(user).data, status=status.HTTP_201_CREATED)
+        except KeyError:
+            return Response({'error': 'Missing username, password or email'}, status=status.HTTP_400_BAD_REQUEST)

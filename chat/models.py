@@ -31,7 +31,7 @@ class Group(models.Model):
     members = models.ManyToManyField(User, related_name='members')
     groupName = models.TextField(max_length=50)
     description = models.TextField(max_length=500, blank=True)
-    groupAdmin = models.ManyToManyField(User, related_name='groupAdmin')
+    groupAdmins = models.ManyToManyField(User, related_name='groupAdmins')
     pinnedMessage = models.ManyToManyField('Message', blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
 
