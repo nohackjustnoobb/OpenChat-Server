@@ -33,7 +33,8 @@ class Group(models.Model):
     description = models.TextField(max_length=500, blank=True, null=True)
     lastMessage = models.ForeignKey('Message', on_delete=models.SET_NULL, null=True, related_name='lastMessage')
     groupAdmins = models.ManyToManyField(User, related_name='groupAdmins')
-    pinnedMessage = models.ManyToManyField('Message', blank=True)
+    pinnedMessages = models.ManyToManyField('Message', blank=True, related_name='pinnedMessages')
+    messages = models.ManyToManyField('Message', blank=True, related_name='messages')
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
 
     def __str__(self):
@@ -44,7 +45,6 @@ class Message(models.Model):
     sendDateTime = models.DateTimeField(auto_now_add=True)
     content = models.TextField(max_length=5000, blank=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='owner', null=True)
-    sentGroup = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='sentGroup')
     additionFile = models.FileField(upload_to='files/', blank=True, validators=[maxFileSize])
     additionImage = models.ImageField(upload_to='images/', blank=True, validators=[maxImageSize])
     MemberRead = models.ImageField(default=0)

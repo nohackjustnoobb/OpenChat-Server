@@ -11,15 +11,15 @@ from user.models import User
 from user.serializers import SimpleUserSerializers, UserSerializers
 
 
-class AdminOrIsMemberPermission(permissions.BasePermission):
+class AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
-        return request.user in obj.members.all() or request.user.is_superuser
+        return request.user.is_superuser or request.user == obj.owner or request.user in obj.groupAdmins.all() or (
+                request.user in obj.members.all() and request.method in permissions.SAFE_METHODS)
 
 
-# todo: patch server info
 class GroupViewSets(viewsets.ViewSet):
     queryset = Group.objects.filter(isDM=False)
-    permission_classes = [IsAuthenticated, AdminOrIsMemberPermission]
+    permission_classes = [IsAuthenticated, AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
 
     def list(self, request):
         user = request.user
@@ -43,11 +43,21 @@ class GroupViewSets(viewsets.ViewSet):
         return Response({"detail": "You do not have permission to perform this action."},
                         status=status.HTTP_403_FORBIDDEN)
 
-
-class AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return request.user.is_superuser or request.user == obj.owner or request.user in obj.groupAdmins.all() or (
-                request.user in obj.members.all() and request.method in permissions.SAFE_METHODS)
+    def partial_update(self, request, pk=None):
+        group = get_object_or_404(self.queryset, pk=pk)
+        updateData = request.data
+        self.check_object_permissions(request, group)
+        allowUpdate = ['groupName', 'description', 'avatar']
+        filteredData = {}
+        for key, value in updateData.items():
+            if key in allowUpdate:
+                filteredData[key] = value
+        serializer = GroupSerializers(group, data=filteredData, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class GroupMembersViewSets(viewsets.ViewSet):

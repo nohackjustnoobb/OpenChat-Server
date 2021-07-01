@@ -48,7 +48,7 @@ class UserViewSet(viewsets.ViewSet):
 
     # todo: max result return and multiple page
     def list(self, request):
-        # show more info if user is admin
+        # show more info if user is admin or friend
         if request.user.is_superuser:
             serializer = UserSerializers(self.queryset, many=True)
         else:
@@ -68,8 +68,8 @@ class UserViewSet(viewsets.ViewSet):
 # admin or owner can GET and PATCH with limited option permission
 class AdminOrOwnerPlusSafeMethodsPermission(permissions.BasePermission):
     def has_permission(self, request, view):
-        allowed_change = ['password', 'avatar', 'bio', 'username']
-        if request.method in permissions.SAFE_METHODS or request.data.keys() in allowed_change \
+        allowedUpdate = ['password', 'avatar', 'bio', 'username']
+        if request.method in permissions.SAFE_METHODS or request.data.keys() in allowedUpdate \
                 or request.user.is_superuser or request.method == 'PATCH':
             return True
         return False
@@ -85,13 +85,18 @@ class MyInfo(APIView):
 
     def patch(self, request, pk=None):
         user = request.user
-        update_data = request.data
+        updateData = request.data
         # try pop the password out
         try:
-            update_data.data.pop('password')
+            updateData.data.pop('password')
         finally:
+            allowedUpdate = ['username', 'bio', 'avatar']
+            filteredData = {}
+            for key, value in updateData.items():
+                if key in allowedUpdate:
+                    filteredData[key] = value
             # update data and check if it is valid
-            serializer = UserSerializers(user, data=update_data, partial=True)
+            serializer = UserSerializers(user, data=filteredData, partial=True)
             if serializer.is_valid():
                 try:
                     # apply password if it is available
@@ -105,7 +110,7 @@ class MyInfo(APIView):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({'error': 'Data is invalid'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class FriendsAndBlockedViewSet(viewsets.ViewSet):

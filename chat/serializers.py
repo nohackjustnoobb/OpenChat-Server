@@ -37,7 +37,7 @@ class GroupSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = Group
-        exclude = ['isDM']
+        exclude = ['isDM', 'messages']
 
 
 class DMSerializers(serializers.ModelSerializer):
