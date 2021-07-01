@@ -6,9 +6,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Group, Message
-from .serializers import SimpleGroupSerializers, GroupSerializers
+from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers
 from user.models import User
-from user.serializers import SimpleUserSerializers
+from user.serializers import SimpleUserSerializers, UserSerializers
 
 
 class AdminOrIsMemberPermission(permissions.BasePermission):
@@ -18,12 +18,12 @@ class AdminOrIsMemberPermission(permissions.BasePermission):
 
 # todo: patch server info
 class GroupViewSets(viewsets.ViewSet):
-    queryset = Group.objects.all()
+    queryset = Group.objects.filter(isDM=False)
     permission_classes = [IsAuthenticated, AdminOrIsMemberPermission]
 
     def list(self, request):
         user = request.user
-        groupsList = Group.objects.filter(members__in=[user]).distinct()
+        groupsList = Group.objects.filter(members__in=[user], isDM=False).distinct()
         serializer = SimpleGroupSerializers(groupsList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -55,14 +55,14 @@ class GroupMembersViewSets(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
 
     def list(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         serializer = SimpleUserSerializers(group.members.all(), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # Maybe todo: user can only invite them friends
     def create(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         addMembers = request.data.get('members')
         # not allow empty list
@@ -79,11 +79,11 @@ class GroupMembersViewSets(viewsets.ViewSet):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None, userPK=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         kickMember = get_object_or_404(group.members.all(), pk=userPK)
-        if not kickMember == group.owner and not kickMember != request.user:
-            if kickMember in group.groupAdmins.all() or request.user == group.owner:
+        if not kickMember == group.owner and kickMember != request.user:
+            if kickMember not in group.groupAdmins.all() or request.user == group.owner:
                 group.members.remove(kickMember)
                 if kickMember in group.groupAdmins.all():
                     group.groupAdmins.remove(kickMember)
@@ -96,13 +96,13 @@ class GroupAdminsViewSets(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
 
     def list(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         serializer = SimpleUserSerializers(group.groupAdmins.all(), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         # only owner can add user to group admins
         if request.user != group.owner:
@@ -117,7 +117,7 @@ class GroupAdminsViewSets(viewsets.ViewSet):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None, userPK=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         if request.user == group.owner:
             removeAdmin = get_object_or_404(group.groupAdmins.all(), pk=userPK)
@@ -127,11 +127,10 @@ class GroupAdminsViewSets(viewsets.ViewSet):
 
 
 class LeaveGroup(APIView):
-    queryset = Group.objects.all()
     permission_classes = [IsAuthenticated, AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
 
     def get(self, request, pk=None):
-        group = get_object_or_404(self.queryset, pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
         self.check_object_permissions(request, group)
         user = request.user
         group.members.remove(user)
@@ -168,3 +167,42 @@ class CreateGroup(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class DMViewSets(viewsets.ViewSet):
+    queryset = Group.objects.filter(isDM=True)
+    permission_classes = [IsAuthenticated, AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
+
+    def list(self, request):
+        user = request.user
+        serializer = DMSerializers(self.queryset.filter(members=user.id), many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        user = request.user
+        DM = get_object_or_404(self.queryset, pk=pk)
+        self.check_object_permissions(request, DM)
+        DMUser = DM.members.exclude(pk=user.id).first()
+        serializer = UserSerializers(DMUser)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CreateDM(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        user = request.user
+        userFriendPK = request.data.get('friend')
+        if userFriendPK:
+            userFriend = get_object_or_404(user.friends.all(), pk=userFriendPK)
+            DMGroupList = Group.objects.filter(isDM=True, members=user.id).filter(members=userFriendPK)
+            if DMGroupList.exists():
+                serializer = DMSerializers(DMGroupList.first())
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                groupName = f'{user.id}, {userFriend.id}'
+                DMCreated = Group.objects.create(groupName=groupName, isDM=True)
+                DMCreated.members.add(user, userFriend)
+                serializer = DMSerializers(DMCreated)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(status=status.HTTP_400_BAD_REQUEST)

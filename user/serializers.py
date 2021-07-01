@@ -9,12 +9,9 @@ class SimpleUserSerializers(serializers.ModelSerializer):
 
 
 class UserSerializers(serializers.ModelSerializer):
-    friends = SimpleUserSerializers(many=True, read_only=True)
-    blocked = SimpleUserSerializers(many=True, read_only=True)
-
     class Meta:
         model = User
-        exclude = ['password', 'user_permissions', 'groups']
+        exclude = ['password', 'user_permissions', 'groups', 'friends', 'blocked', 'is_active']
 
 
 class FriendRequestSerializers(serializers.ModelSerializer):

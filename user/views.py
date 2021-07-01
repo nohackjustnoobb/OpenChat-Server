@@ -58,7 +58,7 @@ class UserViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         user = get_object_or_404(self.queryset, pk=pk)
         # show more info if user is admin
-        if request.user.is_superuser:
+        if request.user.is_superuser or user.friends.filter(pk=request.user.id).exists():
             serializer = UserSerializers(user)
         else:
             serializer = SimpleUserSerializers(user)

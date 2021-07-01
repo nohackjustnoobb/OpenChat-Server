@@ -3,18 +3,20 @@ from user.serializers import SimpleUserSerializers
 from rest_framework import serializers
 
 
-class SimpleGroupSerializers(serializers.ModelSerializer):
-    class Meta:
-        model = Group
-        fields = ['id', 'groupName', 'description', 'avatar']
-
-
 class SimpleMessageSerializers(serializers.ModelSerializer):
     owner = SimpleUserSerializers(read_only=True)
 
     class Meta:
         model = Message
-        exclude = ['sendDateTime', 'relyTo', 'MemberRead', 'sentGroup']
+        exclude = ['relyTo', 'MemberRead', 'sentGroup']
+
+
+class SimpleGroupSerializers(serializers.ModelSerializer):
+    lastMessage = SimpleMessageSerializers(read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ['id', 'groupName', 'avatar', 'lastMessage']
 
 
 class MessageSerializers(serializers.ModelSerializer):
@@ -31,7 +33,17 @@ class GroupSerializers(serializers.ModelSerializer):
     owner = SimpleUserSerializers()
     members = SimpleUserSerializers(many=True, read_only=True)
     groupAdmins = SimpleUserSerializers(many=True, read_only=True)
+    lastMessage = SimpleMessageSerializers(read_only=True)
 
     class Meta:
         model = Group
-        fields = '__all__'
+        exclude = ['isDM']
+
+
+class DMSerializers(serializers.ModelSerializer):
+    members = SimpleUserSerializers(many=True, read_only=True)
+    lastMessage = SimpleMessageSerializers(read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ['members', 'pinnedMessage', 'id', 'createDate', 'lastMessage']
