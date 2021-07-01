@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Group, Message
-from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers
+from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers, MessageSerializers, \
+    MessageReadSerializers
 from user.models import User
 from user.serializers import SimpleUserSerializers, UserSerializers
 
@@ -216,3 +217,38 @@ class CreateDM(APIView):
                 serializer = DMSerializers(DMCreated)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class IsGroupMemberPermission(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return request.user in obj.members.all()
+
+
+class MessageViewSets(viewsets.ViewSet):
+    queryset = Message.objects.all()
+    permission_classes = [IsGroupMemberPermission]
+
+    def list(self, request, pk=None):
+        group = get_object_or_404(Group.objects.all(), pk=pk)
+        self.check_object_permissions(request, group)
+        for message in group.messages.exclude(memberRead__in=[request.user.id]):
+            message.memberRead.add(request.user)
+        serializer = MessageSerializers(group.messages.all(), many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, pk=None):
+        group = get_object_or_404(Group.objects.all(), pk=pk)
+        self.check_object_permissions(request, group)
+        messageData = request.data
+        additionFile = messageData.get('additionFile')
+        additionImage = messageData.get('additionImage')
+        content = messageData.get('content')
+        relyTo = messageData.get('relyTo')
+        if relyTo:
+            relyTo = get_object_or_404(group.messages.all(), pk=relyTo)
+        messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
+                                                additionImage=additionImage, content=content, relyTo=relyTo)
+        messageCreated.MemberRead.add(request.user)
+        group.messages.add(messageCreated)
+        serializer = MessageSerializers(messageCreated)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

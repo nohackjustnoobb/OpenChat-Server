@@ -8,7 +8,7 @@ class SimpleMessageSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        exclude = ['relyTo', 'MemberRead', 'sentGroup']
+        exclude = ['relyTo', 'memberRead']
 
 
 class SimpleGroupSerializers(serializers.ModelSerializer):
@@ -19,6 +19,17 @@ class SimpleGroupSerializers(serializers.ModelSerializer):
         fields = ['id', 'groupName', 'avatar', 'lastMessage']
 
 
+class MessageReadSerializers(serializers.ModelSerializer):
+    owner = SimpleUserSerializers(read_only=True)
+    sentGroup = SimpleGroupSerializers(read_only=True)
+    relyTo = SimpleMessageSerializers(read_only=True)
+    memberRead = SimpleUserSerializers(many=True, read_only=True)
+
+    class Meta:
+        model = Message
+        fields = '__all__'
+
+
 class MessageSerializers(serializers.ModelSerializer):
     owner = SimpleUserSerializers(read_only=True)
     sentGroup = SimpleGroupSerializers(read_only=True)
@@ -26,7 +37,7 @@ class MessageSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = '__all__'
+        exclude = ['memberRead']
 
 
 class GroupSerializers(serializers.ModelSerializer):

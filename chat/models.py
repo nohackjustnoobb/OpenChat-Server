@@ -47,7 +47,7 @@ class Message(models.Model):
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='owner', null=True)
     additionFile = models.FileField(upload_to='files/', blank=True, validators=[maxFileSize])
     additionImage = models.ImageField(upload_to='images/', blank=True, validators=[maxImageSize])
-    MemberRead = models.ImageField(default=0)
+    memberRead = models.ManyToManyField(User, related_name='MemberRead')
     deleted = models.BooleanField(default=False)
     relyTo = models.ForeignKey('Message', on_delete=models.SET_NULL, blank=True, null=True)
 

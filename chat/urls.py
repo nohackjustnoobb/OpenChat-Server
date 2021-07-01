@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import GroupViewSets, CreateGroup, GroupMembersViewSets, GroupAdminsViewSets, LeaveGroup, CreateDM, \
-    DMViewSets
+    DMViewSets, MessageViewSets
 
 GroupUrlPatterns = [
     path('', GroupViewSets.as_view({'get': 'list'})),
@@ -9,6 +9,7 @@ GroupUrlPatterns = [
     path('<int:pk>/members/<int:userPK>/', GroupMembersViewSets.as_view({'delete': 'destroy'})),
     path('<int:pk>/members/leave/', LeaveGroup.as_view()),
     path('<int:pk>/admins/', GroupAdminsViewSets.as_view({'get': 'list', 'post': 'create'})),
+    path('<int:pk>/messages/', MessageViewSets.as_view({'get': 'list', 'post': 'create'})),
     path('create/', CreateGroup.as_view())
 ]
 
