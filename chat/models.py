@@ -17,11 +17,27 @@ def maxImageSize(value):
         raise ValidationError('Image too large. Size should not exceed 10 MiB.')
 
 
-# max Avatar Size is 20MB
+# max Avatar Size is 10MB
 def maxAvatarSize(value):
     limit = 10 * 1024 * 1024
     if value.size > limit:
         raise ValidationError('Image too large. Size should not exceed 20 MiB.')
+
+
+class ModifyLog(models.Model):
+    modifyDateTime = models.DateTimeField(auto_now_add=True)
+    modifyUser = models.ForeignKey(User, on_delete=models.CASCADE, related_name='modifyUser')
+    affectedUser = models.ManyToManyField(User, related_name='affectedUser')
+
+    actionsChoice = [
+        ('ic', 'InfoChange'),
+        ('ma', 'MembersAdd'),
+        ('aa', 'AdminAdd'),
+        ('ar', 'AdminRemove'),
+        ('mk', 'MemberKick')
+    ]
+
+    action = models.CharField(max_length=2, choices=actionsChoice)
 
 
 class Group(models.Model):
@@ -36,6 +52,7 @@ class Group(models.Model):
     pinnedMessages = models.ManyToManyField('Message', blank=True, related_name='pinnedMessages')
     messages = models.ManyToManyField('Message', blank=True, related_name='messages')
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
+    logs = models.ManyToManyField(ModifyLog, related_name='logs')
 
     def __str__(self):
         return f'#{self.id} {self.groupName}'

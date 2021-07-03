@@ -1,10 +1,16 @@
-from .models import Message, Group
-from user.serializers import SimpleUserSerializers
+from .models import Message, Group, ModifyLog
 from rest_framework import serializers
 
 
-class SimpleMessageSerializers(serializers.ModelSerializer):
+class ChoicesSerializerField(serializers.SerializerMethodField):
 
+    def to_representation(self, value):
+        method_name = 'get_{field_name}_display'.format(field_name=self.field_name)
+        method = getattr(value, method_name)
+        return method()
+
+
+class SimpleMessageSerializers(serializers.ModelSerializer):
     class Meta:
         model = Message
         exclude = ['relyTo', 'memberRead']
@@ -35,20 +41,24 @@ class MessageSerializers(serializers.ModelSerializer):
 
 
 class GroupSerializers(serializers.ModelSerializer):
-    owner = SimpleUserSerializers()
-    members = SimpleUserSerializers(many=True, read_only=True)
-    groupAdmins = SimpleUserSerializers(many=True, read_only=True)
     lastMessage = SimpleMessageSerializers(read_only=True)
 
     class Meta:
         model = Group
-        exclude = ['isDM', 'messages']
+        exclude = ['isDM', 'messages', 'logs']
 
 
 class DMSerializers(serializers.ModelSerializer):
-    members = SimpleUserSerializers(many=True, read_only=True)
     lastMessage = SimpleMessageSerializers(read_only=True)
 
     class Meta:
         model = Group
         fields = ['members', 'pinnedMessages', 'id', 'createDate', 'lastMessage']
+
+
+class ModifyLogSerializers(serializers.ModelSerializer):
+    action = ChoicesSerializerField()
+
+    class Meta:
+        model = ModifyLog
+        exclude = ['id']

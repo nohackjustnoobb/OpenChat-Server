@@ -5,9 +5,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .models import Group, Message
+from .models import Group, Message, ModifyLog
 from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers, MessageSerializers, \
-    MessageReadSerializers
+    MessageReadSerializers, ModifyLogSerializers
 from user.models import User
 from user.serializers import SimpleUserSerializers, UserSerializers
 
@@ -56,6 +56,8 @@ class GroupViewSets(viewsets.ViewSet):
         serializer = GroupSerializers(group, data=filteredData, partial=True)
         if serializer.is_valid():
             serializer.save()
+            log = ModifyLog.objects.create(modifyUser=request.user, action='ic')
+            group.logs.add(log)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -71,21 +73,24 @@ class GroupMembersViewSets(viewsets.ViewSet):
         serializer = SimpleUserSerializers(group.members.all(), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    # Maybe todo: user can only invite them friends
     def create(self, request, pk=None):
         group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
+        user = request.user
         self.check_object_permissions(request, group)
         addMembers = request.data.get('members')
         # not allow empty list
         if addMembers:
             # convert pk to objects
-            addMembersList = User.objects.filter(pk__in=addMembers)
+            addMembersList = user.friends.filter(pk__in=addMembers)
             if addMembersList.count() != len(addMembers):
                 return Response(status=status.HTTP_404_NOT_FOUND)
             # not allow to add user that is already in group
             if not group.members.filter(pk__in=addMembers).exists():
                 group.members.add(*addMembersList)
                 serializer = SimpleUserSerializers(group.members.all(), many=True)
+                log = ModifyLog.objects.create(modifyUser=user, action='ma')
+                log.affectedUser.add(*addMembersList)
+                group.logs.add(log)
                 return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -96,6 +101,9 @@ class GroupMembersViewSets(viewsets.ViewSet):
         if not kickMember == group.owner and kickMember != request.user:
             if kickMember not in group.groupAdmins.all() or request.user == group.owner:
                 group.members.remove(kickMember)
+                log = ModifyLog.objects.create(modifyUser=request.user, action='mk')
+                log.affectedUser.add(kickMember)
+                group.logs.add(log)
                 if kickMember in group.groupAdmins.all():
                     group.groupAdmins.remove(kickMember)
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -124,6 +132,9 @@ class GroupAdminsViewSets(viewsets.ViewSet):
             if addAdminsList.count() == len(addAdmins) and not group.groupAdmins.filter(pk__in=addAdmins).exists():
                 group.groupAdmins.add(*addAdminsList)
                 serializer = SimpleUserSerializers(group.groupAdmins.all(), many=True)
+                log = ModifyLog.objects.create(modifyUser=request.user, action='aa')
+                log.affectedUser.add(*addAdminsList)
+                group.logs.add(log)
                 return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -133,6 +144,9 @@ class GroupAdminsViewSets(viewsets.ViewSet):
         if request.user == group.owner:
             removeAdmin = get_object_or_404(group.groupAdmins.all(), pk=userPK)
             group.groupAdmins.remove(removeAdmin)
+            log = ModifyLog.objects.create(modifyUser=request.user, action='ar')
+            log.affectedUser.add(removeAdmin)
+            group.logs.add(log)
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -178,6 +192,16 @@ class CreateGroup(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class GroupLogs(APIView):
+    permission_classes = [AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
+
+    def get(self, request, pk=None):
+        group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
+        self.check_object_permissions(request, group)
+        serializer = ModifyLogSerializers(group.logs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class DMViewSets(viewsets.ViewSet):
@@ -279,5 +303,7 @@ class MessageViewSets(viewsets.ViewSet):
                                                 additionImage=additionImage, content=content, relyTo=relyTo)
         messageCreated.memberRead.add(request.user)
         group.messages.add(messageCreated)
+        group.lastMessage = messageCreated
+        group.save()
         serializer = MessageSerializers(messageCreated)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

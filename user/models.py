@@ -7,7 +7,7 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import ValidationError
 
 
-# max Avatar Size is 20MB
+# max Avatar Size is 10MB
 def maxAvatarSize(value):
     limit = 10 * 1024 * 1024
     if value.size > limit:
