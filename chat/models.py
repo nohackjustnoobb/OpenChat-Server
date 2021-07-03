@@ -28,6 +28,7 @@ class ModifyLog(models.Model):
     modifyDateTime = models.DateTimeField(auto_now_add=True)
     modifyUser = models.ForeignKey(User, on_delete=models.CASCADE, related_name='modifyUser')
     affectedUser = models.ManyToManyField(User, related_name='affectedUser')
+    memberSaw = models.ManyToManyField(User, related_name='memberSaw')
 
     actionsChoice = [
         ('ic', 'InfoChange'),

@@ -199,8 +199,16 @@ class GroupLogs(APIView):
 
     def get(self, request, pk=None):
         group = get_object_or_404(Group.objects.filter(isDM=False), pk=pk)
+        user = request.user
         self.check_object_permissions(request, group)
-        serializer = ModifyLogSerializers(group.logs, many=True)
+        logsList = group.logs.exclude(memberSaw__in=[user.id])
+        allLogs = request.query_params.get('all')
+        for log in logsList:
+            log.memberSaw.add(user)
+        if allLogs == 'true':
+            serializer = ModifyLogSerializers(group.logs, many=True)
+        else:
+            serializer = ModifyLogSerializers(logsList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -260,7 +268,20 @@ class MessageViewSets(viewsets.ViewSet):
             message.memberRead.add(request.user)
         allMessage = request.query_params.get('all')
         if allMessage == 'true':
-            serializer = MessageSerializers(group.messages.all(), many=True)
+            startMessage = request.query_params.get('start')
+            maxResult = request.query_params.get('max')
+            try:
+                if not maxResult:
+                    maxResult = 50
+                maxResult = int(maxResult)
+                if startMessage:
+                    startMessage = int(startMessage)
+                    serializer = MessageSerializers(group.messages.all()[startMessage:maxResult + startMessage],
+                                                    many=True)
+                else:
+                    raise TypeError
+            except TypeError:
+                serializer = MessageSerializers(group.messages.all()[:maxResult], many=True)
         else:
             serializer = MessageSerializers(messagesList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

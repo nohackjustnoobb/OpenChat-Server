@@ -61,4 +61,4 @@ class ModifyLogSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = ModifyLog
-        exclude = ['id']
+        exclude = ['id', 'memberSaw']
