@@ -4,7 +4,6 @@ from rest_framework import serializers
 
 
 class SimpleMessageSerializers(serializers.ModelSerializer):
-    owner = SimpleUserSerializers(read_only=True)
 
     class Meta:
         model = Message
@@ -20,10 +19,7 @@ class SimpleGroupSerializers(serializers.ModelSerializer):
 
 
 class MessageReadSerializers(serializers.ModelSerializer):
-    owner = SimpleUserSerializers(read_only=True)
-    sentGroup = SimpleGroupSerializers(read_only=True)
     relyTo = SimpleMessageSerializers(read_only=True)
-    memberRead = SimpleUserSerializers(many=True, read_only=True)
 
     class Meta:
         model = Message
@@ -31,8 +27,6 @@ class MessageReadSerializers(serializers.ModelSerializer):
 
 
 class MessageSerializers(serializers.ModelSerializer):
-    owner = SimpleUserSerializers(read_only=True)
-    sentGroup = SimpleGroupSerializers(read_only=True)
     relyTo = SimpleMessageSerializers(read_only=True)
 
     class Meta:
@@ -57,4 +51,4 @@ class DMSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = Group
-        fields = ['members', 'pinnedMessage', 'id', 'createDate', 'lastMessage']
+        fields = ['members', 'pinnedMessages', 'id', 'createDate', 'lastMessage']

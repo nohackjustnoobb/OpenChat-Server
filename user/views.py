@@ -46,18 +46,17 @@ class UserViewSet(viewsets.ViewSet):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
 
-    # todo: max result return and multiple page
     def list(self, request):
-        # show more info if user is admin or friend
+        # only admin allow to list all user
         if request.user.is_superuser:
             serializer = UserSerializers(self.queryset, many=True)
-        else:
-            serializer = SimpleUserSerializers(self.queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"detail": "You do not have permission to perform this action."},
+                        status=status.HTTP_403_FORBIDDEN)
 
     def retrieve(self, request, pk=None):
         user = get_object_or_404(self.queryset, pk=pk)
-        # show more info if user is admin
+        # show more info if user is admin or friend
         if request.user.is_superuser or user.friends.filter(pk=request.user.id).exists():
             serializer = UserSerializers(user)
         else:

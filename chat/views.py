@@ -231,10 +231,39 @@ class MessageViewSets(viewsets.ViewSet):
     def list(self, request, pk=None):
         group = get_object_or_404(Group.objects.all(), pk=pk)
         self.check_object_permissions(request, group)
-        for message in group.messages.exclude(memberRead__in=[request.user.id]):
+        messagesList = group.messages.exclude(memberRead__in=[request.user.id])
+        for message in messagesList:
             message.memberRead.add(request.user)
-        serializer = MessageSerializers(group.messages.all(), many=True)
+        allMessage = request.query_params.get('all')
+        if allMessage == 'true':
+            serializer = MessageSerializers(group.messages.all(), many=True)
+        else:
+            serializer = MessageSerializers(messagesList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None, messagePK=None):
+        group = get_object_or_404(Group.objects.all(), pk=pk)
+        self.check_object_permissions(request, group)
+        message = get_object_or_404(group.messages.all(), pk=messagePK)
+        if message.owner == request.user:
+            serializer = MessageReadSerializers(message)
+        else:
+            serializer = MessageSerializers(message)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None, messagePK=None):
+        group = get_object_or_404(Group.objects.all(), pk=pk)
+        self.check_object_permissions(request, group)
+        message = get_object_or_404(group.messages.all(), pk=messagePK)
+        if message.owner == request.user:
+            message.deleted = True
+            message.content = ''
+            message.additionFile = None
+            message.additionImage = None
+            message.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"detail": "You do not have permission to perform this action."},
+                        status=status.HTTP_403_FORBIDDEN)
 
     def create(self, request, pk=None):
         group = get_object_or_404(Group.objects.all(), pk=pk)
@@ -248,7 +277,7 @@ class MessageViewSets(viewsets.ViewSet):
             relyTo = get_object_or_404(group.messages.all(), pk=relyTo)
         messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
                                                 additionImage=additionImage, content=content, relyTo=relyTo)
-        messageCreated.MemberRead.add(request.user)
+        messageCreated.memberRead.add(request.user)
         group.messages.add(messageCreated)
         serializer = MessageSerializers(messageCreated)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

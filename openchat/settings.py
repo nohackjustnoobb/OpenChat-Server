@@ -77,7 +77,7 @@ WSGI_APPLICATION = 'openchat.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'openchat',
+        'NAME': 'OpenChat',
         'USER': 'nohack',
         'PASSWORD': '',
         'HOST': 'localhost',
