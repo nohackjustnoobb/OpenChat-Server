@@ -261,7 +261,7 @@ class MessageViewSets(viewsets.ViewSet):
     permission_classes = [IsGroupMemberPermission]
 
     def list(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
         self.check_object_permissions(request, group)
         messagesList = group.messages.exclude(memberRead__in=[request.user.id])
         for message in messagesList:
@@ -287,7 +287,7 @@ class MessageViewSets(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, messagePK=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
         self.check_object_permissions(request, group)
         message = get_object_or_404(group.messages.all(), pk=messagePK)
         if message.owner == request.user:
@@ -297,7 +297,7 @@ class MessageViewSets(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None, messagePK=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
         self.check_object_permissions(request, group)
         message = get_object_or_404(group.messages.all(), pk=messagePK)
         if message.owner == request.user:
@@ -311,7 +311,7 @@ class MessageViewSets(viewsets.ViewSet):
                         status=status.HTTP_403_FORBIDDEN)
 
     def create(self, request, pk=None):
-        group = get_object_or_404(Group.objects.all(), pk=pk)
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
         self.check_object_permissions(request, group)
         messageData = request.data
         additionFile = messageData.get('additionFile')
@@ -328,3 +328,33 @@ class MessageViewSets(viewsets.ViewSet):
         group.save()
         serializer = MessageSerializers(messageCreated)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class PinnedMessageViewSet(viewsets.ViewSet):
+    queryset = Message.objects.all()
+    permission_classes = [AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission]
+
+    def list(self, request, pk=None):
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
+        self.check_object_permissions(request, group)
+        serializer = MessageSerializers(group.pinnedMessages.all(), many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def create(self, request, pk=None, messagePK=None):
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
+        self.check_object_permissions(request, group)
+        pinMessage = get_object_or_404(group.messages.all(), pk=messagePK)
+        group.pinnedMessages.add(pinMessage)
+        serializer = MessageSerializers(pinMessage)
+        log = ModifyLog.objects.create(modifyUser=request.user, action='pm')
+        group.logs.add(log)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None, messagePK=None):
+        group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
+        self.check_object_permissions(request, group)
+        pinnedMessage = get_object_or_404(group.pinnedMessages.all(), pk=messagePK)
+        group.pinnedMessages.remove(pinnedMessage)
+        log = ModifyLog.objects.create(modifyUser=request.user, action='rp')
+        group.logs.add(log)
+        return Response(status=status.HTTP_204_NO_CONTENT)

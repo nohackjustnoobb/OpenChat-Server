@@ -35,7 +35,9 @@ class ModifyLog(models.Model):
         ('ma', 'MembersAdd'),
         ('aa', 'AdminAdd'),
         ('ar', 'AdminRemove'),
-        ('mk', 'MemberKick')
+        ('mk', 'MemberKick'),
+        ('pm', 'PinMessage'),
+        ('rp', 'RemovePin')
     ]
 
     action = models.CharField(max_length=2, choices=actionsChoice)
