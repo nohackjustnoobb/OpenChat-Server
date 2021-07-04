@@ -257,9 +257,19 @@ class IsGroupMemberPermission(permissions.BasePermission):
         return request.user in obj.members.all()
 
 
+class IsBlockedPermission(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if str(request.path).find('group') == -1 and request.method != 'GET':
+            user = request.user
+            anotherUser = obj.members.exclude(pk__in=[user.id]).first()
+            return not (user.blocked.filter(pk=anotherUser.id).exists() or anotherUser.blocked.filter(
+                pk=user.id).exists())
+        return True
+
+
 class MessageViewSets(viewsets.ViewSet):
     queryset = Message.objects.all()
-    permission_classes = [IsGroupMemberPermission]
+    permission_classes = [IsGroupMemberPermission, IsBlockedPermission]
 
     def list(self, request, pk=None):
         group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
