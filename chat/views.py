@@ -246,6 +246,7 @@ class CreateDM(APIView):
                 groupName = f'{user.id}, {userFriend.id}'
                 DMCreated = Group.objects.create(groupName=groupName, isDM=True)
                 DMCreated.members.add(user, userFriend)
+                DMCreated.groupAdmins.add(user, userFriend)
                 serializer = DMSerializers(DMCreated)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
