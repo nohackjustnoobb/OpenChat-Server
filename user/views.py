@@ -1,3 +1,4 @@
+import json
 from .serializers import UserSerializers, FriendsAndBlockedSerializers, SimpleUserSerializers, FriendRequestSerializers
 from .models import User, FriendRequest
 from rest_framework import viewsets
@@ -173,11 +174,17 @@ class AdminOrBeingRequestedOrOwnerPermission(permissions.BasePermission):
                        request.method == 'DELETE' and request.user == obj.fromUser) or request.user.is_superuser
 
 
-class FriendRequestReplyOrCancel(APIView):
+class FriendRequestViewSets(viewsets.ViewSet):
     queryset = FriendRequest.objects.all()
     permission_classes = [AdminOrBeingRequestedOrOwnerPermission]
 
-    def get(self, request, pk=None):
+    def list(self, request):
+        user = request.user
+        friendRequestsList = FriendRequest.objects.filter(toUser=user) | FriendRequest.objects.filter(fromUser=user)
+        serializer = FriendRequestSerializers(friendRequestsList, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
         friendRequest = get_object_or_404(self.queryset, pk=pk)
         self.check_object_permissions(self.request, friendRequest)
         # try to get reply
@@ -197,7 +204,7 @@ class FriendRequestReplyOrCancel(APIView):
             serializer = FriendRequestSerializers(friendRequest)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         friendRequest = get_object_or_404(self.queryset, pk=pk)
         self.check_object_permissions(self.request, friendRequest)
         friendRequest.delete()
@@ -223,6 +230,7 @@ class BlockOrUnBlockUser(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+# todo: email validation
 class CreateUser(APIView):
     permission_classes = [AllowAny]
 

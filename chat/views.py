@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import viewsets
 from rest_framework import status
 from rest_framework import permissions
@@ -10,6 +12,17 @@ from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers
     MessageReadSerializers, ModifyLogSerializers
 from user.models import User
 from user.serializers import SimpleUserSerializers, UserSerializers
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+
+def sendMessageToConsumers(userID, message):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(str(userID), {'type': 'sendMessage', 'message': json.dumps(message)})
+
+
+def sendLogToConsumers(userID, groupID, log):
+    sendMessageToConsumers(userID, {'groupLog': {'group': groupID, 'log': ModifyLogSerializers(log).data}})
 
 
 class AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission(permissions.BasePermission):
@@ -39,6 +52,8 @@ class GroupViewSets(viewsets.ViewSet):
         user = request.user
         group = get_object_or_404(self.queryset, pk=pk)
         if group.owner == user or user.is_superuser:
+            for groupMember in group.members.all():
+                sendMessageToConsumers(groupMember.id, {'groupDeleted': group.id})
             group.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({"detail": "You do not have permission to perform this action."},
@@ -58,6 +73,9 @@ class GroupViewSets(viewsets.ViewSet):
             serializer.save()
             log = ModifyLog.objects.create(modifyUser=request.user, action='ic')
             group.logs.add(log)
+            for groupMember in group.members.all():
+                sendMessageToConsumers(groupMember.id, {'group': serializer.data})
+                sendLogToConsumers(groupMember.id, group.id, log)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -90,7 +108,12 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 serializer = SimpleUserSerializers(group.members.all(), many=True)
                 log = ModifyLog.objects.create(modifyUser=user, action='ma')
                 log.affectedUser.add(*addMembersList)
+                for groupMember in addMembersList:
+                    sendMessageToConsumers(groupMember.id,
+                                           {'groupAdd': group.id, 'group': GroupSerializers(group).data})
                 group.logs.add(log)
+                for groupMember in group.members.all():
+                    sendLogToConsumers(groupMember.id, group.id, log)
                 return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -189,6 +212,8 @@ class CreateGroup(APIView):
                                                 avatar=avatar)
             groupCreated.members.add(owner, *membersLists)
             serializer = GroupSerializers(groupCreated)
+            for groupMember in groupCreated.members.all():
+                sendMessageToConsumers(groupMember.id, {'groupAdd': groupCreated.id, 'group': serializer.data})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response(status=status.HTTP_400_BAD_REQUEST)

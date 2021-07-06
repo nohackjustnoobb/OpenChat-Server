@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import UserViewSet, MyInfo, CreateUser, FriendsAndBlockedViewSet, CreateFriendsRequest, \
-    FriendRequestReplyOrCancel, BlockOrUnBlockUser
+    FriendRequestViewSets, BlockOrUnBlockUser
 
 urlpatterns = [
     path('', UserViewSet.as_view({'get': 'list'})),
@@ -11,5 +11,6 @@ urlpatterns = [
     path('<int:pk>/remove-friend/', FriendsAndBlockedViewSet.as_view({'delete': 'destroy'})),
     path('<int:pk>/create-friend-request/', CreateFriendsRequest.as_view()),
     path('<int:pk>/block/', BlockOrUnBlockUser.as_view()),
-    path('friend-request/<int:pk>/', FriendRequestReplyOrCancel.as_view()),
+    path('friend-request/', FriendRequestViewSets.as_view({'get': 'list'})),
+    path('friend-request/<int:pk>/', FriendRequestViewSets.as_view({'get': 'retrieve', 'delete': 'destroy'})),
 ]

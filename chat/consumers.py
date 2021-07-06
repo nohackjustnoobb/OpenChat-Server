@@ -13,18 +13,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        await database_sync_to_async(self.toggleOnline)()
+        await database_sync_to_async(self.toggleOnline)(False)
+        if self.scope['user'].is_authenticated:
+            await self.channel_layer.group_discard(str(self.scope['user'].id), self.channel_name)
 
     async def receive(self, text_data):
         jsonData = json.loads(text_data)
+
+        # Authorization
         Authorization = jsonData.get('Authorization')
         if Authorization:
             token = Authorization.split()[1]
-            user = await self.AuthorizationByToken(token)
-            if user.is_authenticated:
-                await self.send(text_data=json.dumps(UserSerializers(user).data))
+            if self.scope['user'].is_authenticated:
+                await self.send(text_data=json.dumps(UserSerializers(self.scope['user']).data))
             else:
-                await self.send(text_data=json.dumps({'error': 'Token is not valid'}))
+                user = await self.AuthorizationByToken(token)
+                if user.is_authenticated:
+                    await self.channel_layer.group_add(str(user.id), self.channel_name)
+                    await self.send(text_data=json.dumps(UserSerializers(user).data))
+                else:
+                    await self.send(text_data=json.dumps({'error': 'Token is not valid'}))
 
     @database_sync_to_async
     def AuthorizationByToken(self, tokenKey):
@@ -32,11 +40,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if self.scope['user'].is_authenticated:
                 raise Token.DoesNotExist
             self.scope['user'] = Token.objects.get(key=tokenKey).user
-            self.toggleOnline()
+            self.toggleOnline(True)
             return self.scope['user']
         except Token.DoesNotExist:
             return self.scope['user']
 
-    def toggleOnline(self):
-        self.scope['user'].isOnline = not self.scope['user'].isOnline
+    def toggleOnline(self, status):
+        self.scope['user'].isOnline = status
         self.scope['user'].save()
+
+    async def sendMessage(self, event):
+        await self.send(text_data=event['message'])
