@@ -24,6 +24,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
     friends = models.ManyToManyField('User', blank=True, related_name='friends_user')
     blocked = models.ManyToManyField('User', blank=True, related_name='blocked_user')
+    isOnline = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'username'
     EMAIL_FIELD = 'email'

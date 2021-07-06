@@ -24,7 +24,7 @@ SECRET_KEY = '+=km1u=j4394vn3&_8_&p^u4w!-md_j8d-gdx2ndn=r8$a18if'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'chat.apps.ChatConfig',
     'rest_framework.authtoken',
     'rest_framework',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -131,3 +132,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Channels
+ASGI_APPLICATION = 'openchat.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("localhost", 6379)],
+        },
+    },
+}
