@@ -4,7 +4,10 @@ from rest_framework.authtoken.models import Token
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
-from user.serializers import UserSerializers
+from user.serializers import UserSerializers, SimpleUserSerializers
+from chat.serializers import GroupSerializers
+from chat.models import Group
+from user.models import User
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -25,14 +28,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if Authorization:
             token = Authorization.split()[1]
             if self.scope['user'].is_authenticated:
-                await self.send(text_data=json.dumps(UserSerializers(self.scope['user']).data))
+                await self.send(text_data=json.dumps({'yourInfo': UserSerializers(self.scope['user']).data}))
             else:
                 user = await self.AuthorizationByToken(token)
                 if user.is_authenticated:
                     await self.channel_layer.group_add(str(user.id), self.channel_name)
-                    await self.send(text_data=json.dumps(UserSerializers(user).data))
+                    groupsList = await self.getUserGroupAndDM()
+                    await self.send(text_data=json.dumps({'yourInfo': UserSerializers(user).data,
+                                                          'group': groupsList}))
                 else:
                     await self.send(text_data=json.dumps({'error': 'Token is not valid'}))
+
+        # get User Data
+        getUsers = jsonData.get('users')
+        if self.scope['user'].is_authenticated and getUsers:
+            usersList = await self.getUserInfo(getUsers)
+            await self.send(text_data=json.dumps({'users': usersList}))
+
+    @database_sync_to_async
+    def getUserInfo(self, users):
+        usersList = User.objects.filter(pk__in=users)
+        userFriendPK = [user.id for user in self.scope['user'].friends.all()]
+        isFriend = usersList.filter(pk__in=userFriendPK)
+        notFriend = usersList.exclude(pk__in=userFriendPK)
+        return [*SimpleUserSerializers(notFriend, many=True).data, *UserSerializers(isFriend, many=True).data]
+
+    @database_sync_to_async
+    def getUserGroupAndDM(self):
+        groupsList = Group.objects.filter(members__in=[self.scope['user'].id])
+        return GroupSerializers(groupsList.all(), many=True).data
 
     @database_sync_to_async
     def AuthorizationByToken(self, tokenKey):

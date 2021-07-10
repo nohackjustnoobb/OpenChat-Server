@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .models import Group, Message, ModifyLog
-from .serializers import SimpleGroupSerializers, GroupSerializers, DMSerializers, MessageSerializers, \
+from .serializers import GroupSerializers, DMSerializers, MessageSerializers, \
     MessageReadSerializers, ModifyLogSerializers
 from user.models import User
 from user.serializers import SimpleUserSerializers, UserSerializers
@@ -38,7 +38,7 @@ class GroupViewSets(viewsets.ViewSet):
     def list(self, request):
         user = request.user
         groupsList = Group.objects.filter(members__in=[user], isDM=False).distinct()
-        serializer = SimpleGroupSerializers(groupsList, many=True)
+        serializer = GroupSerializers(groupsList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None):
@@ -74,7 +74,7 @@ class GroupViewSets(viewsets.ViewSet):
             log = ModifyLog.objects.create(modifyUser=request.user, action='ic')
             group.logs.add(log)
             for groupMember in group.members.all():
-                sendMessageToConsumers(groupMember.id, {'group': serializer.data})
+                sendMessageToConsumers(groupMember.id, {'group': [serializer.data]})
                 sendLogToConsumers(groupMember.id, group.id, log)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
@@ -110,7 +110,7 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 log.affectedUser.add(*addMembersList)
                 for groupMember in addMembersList:
                     sendMessageToConsumers(groupMember.id,
-                                           {'groupAdd': group.id, 'group': GroupSerializers(group).data})
+                                           {'groupAdd': group.id, 'group': [GroupSerializers(group).data]})
                 group.logs.add(log)
                 for groupMember in group.members.all():
                     sendLogToConsumers(groupMember.id, group.id, log)
@@ -213,7 +213,7 @@ class CreateGroup(APIView):
             groupCreated.members.add(owner, *membersLists)
             serializer = GroupSerializers(groupCreated)
             for groupMember in groupCreated.members.all():
-                sendMessageToConsumers(groupMember.id, {'groupAdd': groupCreated.id, 'group': serializer.data})
+                sendMessageToConsumers(groupMember.id, {'groupAdd': groupCreated.id, 'group': [serializer.data]})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response(status=status.HTTP_400_BAD_REQUEST)

@@ -16,14 +16,6 @@ class SimpleMessageSerializers(serializers.ModelSerializer):
         exclude = ['relyTo', 'memberRead']
 
 
-class SimpleGroupSerializers(serializers.ModelSerializer):
-    lastMessage = SimpleMessageSerializers(read_only=True)
-
-    class Meta:
-        model = Group
-        fields = ['id', 'groupName', 'avatar', 'lastMessage']
-
-
 class MessageReadSerializers(serializers.ModelSerializer):
     relyTo = SimpleMessageSerializers(read_only=True)
 
@@ -45,7 +37,7 @@ class GroupSerializers(serializers.ModelSerializer):
 
     class Meta:
         model = Group
-        exclude = ['isDM', 'messages', 'logs', 'pinnedMessages']
+        exclude = ['messages', 'logs', 'pinnedMessages']
 
 
 class DMSerializers(serializers.ModelSerializer):
