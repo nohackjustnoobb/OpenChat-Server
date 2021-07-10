@@ -15,8 +15,10 @@ Including another URLconf
 """
 from django.urls import path, include
 from rest_framework.authtoken import views
+from .ServerInfo import ServerInfoView
 
 urlpatterns = [
+    path('', ServerInfoView.as_view()),
     path('', include('chat.urls')),
     path('user/', include('user.urls')),
     path('token/', views.obtain_auth_token)
