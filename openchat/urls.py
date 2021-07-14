@@ -16,6 +16,8 @@ Including another URLconf
 from django.urls import path, include
 from rest_framework.authtoken import views
 from .ServerInfo import ServerInfoView
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('', ServerInfoView.as_view()),
@@ -23,3 +25,5 @@ urlpatterns = [
     path('user/', include('user.urls')),
     path('token/', views.obtain_auth_token)
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

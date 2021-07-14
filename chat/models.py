@@ -54,7 +54,7 @@ class Group(models.Model):
     groupAdmins = models.ManyToManyField(User, related_name='groupAdmins')
     pinnedMessages = models.ManyToManyField('Message', blank=True, related_name='pinnedMessages')
     messages = models.ManyToManyField('Message', blank=True, related_name='messages')
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
+    avatar = models.ImageField(upload_to='media/avatars/', null=True, blank=True, validators=[maxAvatarSize])
     logs = models.ManyToManyField(ModifyLog, related_name='logs')
 
     def __str__(self):
@@ -65,8 +65,8 @@ class Message(models.Model):
     sendDateTime = models.DateTimeField(auto_now_add=True)
     content = models.TextField(max_length=5000, blank=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='owner', null=True)
-    additionFile = models.FileField(upload_to='files/', blank=True, validators=[maxFileSize])
-    additionImage = models.ImageField(upload_to='images/', blank=True, validators=[maxImageSize])
+    additionFile = models.FileField(upload_to='media/files/', blank=True, validators=[maxFileSize])
+    additionImage = models.ImageField(upload_to='media/images/', blank=True, validators=[maxImageSize])
     memberRead = models.ManyToManyField(User, related_name='MemberRead')
     deleted = models.BooleanField(default=False)
     relyTo = models.ForeignKey('Message', on_delete=models.SET_NULL, blank=True, null=True)

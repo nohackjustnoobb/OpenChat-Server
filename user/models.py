@@ -21,7 +21,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_dev = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     bio = models.TextField(max_length=500, blank=True)
-    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, validators=[maxAvatarSize])
+    avatar = models.ImageField(upload_to='media/avatars/', null=True, blank=True, validators=[maxAvatarSize])
     friends = models.ManyToManyField('User', blank=True, related_name='friends_user')
     blocked = models.ManyToManyField('User', blank=True, related_name='blocked_user')
     isOnline = models.BooleanField(default=False)
