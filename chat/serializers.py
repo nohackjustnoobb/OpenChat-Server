@@ -34,6 +34,13 @@ class MessageSerializers(serializers.ModelSerializer):
 
 class GroupSerializers(serializers.ModelSerializer):
     lastMessage = SimpleMessageSerializers(read_only=True)
+    unReadMessage = serializers.SerializerMethodField(required=False)
+
+    def get_unReadMessage(self, obj):
+        user = self.context.get('user')
+        if user:
+            return obj.messages.exclude(memberRead__in=[user.id]).count()
+        return
 
     class Meta:
         model = Group

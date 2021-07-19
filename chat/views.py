@@ -299,8 +299,7 @@ class MessageViewSets(viewsets.ViewSet):
     def list(self, request, pk=None):
         group = get_object_or_404(Group.objects.filter(isDM=str(request.path).find('group') == -1, pk=pk))
         self.check_object_permissions(request, group)
-        messagesList = group.messages.exclude(memberRead__in=[request.user.id])
-        for message in messagesList:
+        for message in group.messages.all():
             message.memberRead.add(request.user)
         allMessage = request.query_params.get('all')
         if allMessage == 'true':
@@ -319,6 +318,7 @@ class MessageViewSets(viewsets.ViewSet):
             except TypeError:
                 serializer = MessageSerializers(group.messages.all()[:maxResult], many=True)
         else:
+            messagesList = group.messages.exclude(memberRead__in=[request.user.id])
             serializer = MessageSerializers(messagesList, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -354,16 +354,22 @@ class MessageViewSets(viewsets.ViewSet):
         additionImage = messageData.get('additionImage')
         content = messageData.get('content')
         relyTo = messageData.get('relyTo')
-        if relyTo:
-            relyTo = get_object_or_404(group.messages.all(), pk=relyTo)
-        messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
-                                                additionImage=additionImage, content=content, relyTo=relyTo)
-        messageCreated.memberRead.add(request.user)
-        group.messages.add(messageCreated)
-        group.lastMessage = messageCreated
-        group.save()
-        serializer = MessageSerializers(messageCreated)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if additionImage or additionFile or content:
+            if relyTo:
+                relyTo = get_object_or_404(group.messages.all(), pk=relyTo)
+            messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
+                                                    additionImage=additionImage, content=content, relyTo=relyTo)
+            messageCreated.memberRead.add(request.user)
+            group.messages.add(messageCreated)
+            group.lastMessage = messageCreated
+            group.save()
+            serializer = MessageSerializers(messageCreated)
+            for groupMember in group.members.all():
+                sendMessageToConsumers(groupMember.id, {'message': {group.id: serializer.data},
+                                                        'group': [GroupSerializers(group, context={
+                                                            'user': groupMember}).data]})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 class PinnedMessageViewSet(viewsets.ViewSet):

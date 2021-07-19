@@ -56,7 +56,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def getUserGroupAndDM(self):
         groupsList = Group.objects.filter(members__in=[self.scope['user'].id])
-        return GroupSerializers(groupsList.all(), many=True).data
+        return GroupSerializers(groupsList.all(), many=True, context={'user': self.scope['user']}).data
 
     @database_sync_to_async
     def AuthorizationByToken(self, tokenKey):
