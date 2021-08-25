@@ -17,7 +17,7 @@ GroupUrlPatterns = [
     path('<int:pk>/logs/', GroupLogs.as_view()),
     path('<int:pk>/members/', GroupMembersViewSets.as_view({'get': 'list', 'post': 'create'})),
     path('<int:pk>/members/<int:userPK>/', GroupMembersViewSets.as_view({'delete': 'destroy'})),
-    path('<int:pk>/members/leave/', LeaveGroup.as_view()),
+    path('<int:pk>/leave/', LeaveGroup.as_view()),
     path('<int:pk>/admins/', GroupAdminsViewSets.as_view({'get': 'list', 'post': 'create'})),
     path('<int:pk>/admins/<int:userPK>/', GroupAdminsViewSets.as_view({'delete': 'destroy'})),
     path('create/', CreateGroup.as_view())

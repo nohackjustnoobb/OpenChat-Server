@@ -49,7 +49,6 @@ class Group(models.Model):
     isDM = models.BooleanField()
     members = models.ManyToManyField(User, related_name='members')
     groupName = models.TextField(max_length=50)
-    description = models.TextField(max_length=500, blank=True, null=True)
     lastMessage = models.ForeignKey('Message', on_delete=models.SET_NULL, null=True, related_name='lastMessage')
     groupAdmins = models.ManyToManyField(User, related_name='groupAdmins')
     pinnedMessages = models.ManyToManyField('Message', blank=True, related_name='pinnedMessages')
@@ -63,7 +62,7 @@ class Group(models.Model):
 
 class Message(models.Model):
     sendDateTime = models.DateTimeField(auto_now_add=True)
-    content = models.TextField(max_length=5000, blank=True)
+    content = models.TextField(max_length=5000, blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='owner', null=True)
     additionFile = models.FileField(upload_to='media/files/', blank=True, validators=[maxFileSize])
     additionImage = models.ImageField(upload_to='media/images/', blank=True, validators=[maxImageSize])

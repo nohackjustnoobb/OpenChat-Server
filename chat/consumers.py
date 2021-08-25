@@ -1,10 +1,11 @@
 import asyncio
+import datetime
 import json
 from rest_framework.authtoken.models import Token
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
-from user.serializers import UserSerializers, SimpleUserSerializers
+from user.serializers import UserSerializers, SimpleUserSerializers, FriendsAndBlockedSerializers
 from chat.serializers import GroupSerializers
 from chat.models import Group
 from user.models import User
@@ -34,8 +35,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if user.is_authenticated:
                     await self.channel_layer.group_add(str(user.id), self.channel_name)
                     groupsList = await self.getUserGroupAndDM()
+                    relationship = await self.getUserRelationship()
                     await self.send(text_data=json.dumps({'yourInfo': UserSerializers(user).data,
-                                                          'group': groupsList}))
+                                                          'group': groupsList, 'relationship': relationship}))
                 else:
                     await self.send(text_data=json.dumps({'error': 'Token is not valid'}))
 
@@ -59,6 +61,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return GroupSerializers(groupsList.all(), many=True, context={'user': self.scope['user']}).data
 
     @database_sync_to_async
+    def getUserRelationship(self):
+        return FriendsAndBlockedSerializers(self.scope['user']).data
+
+    @database_sync_to_async
     def AuthorizationByToken(self, tokenKey):
         try:
             if self.scope['user'].is_authenticated:
@@ -70,8 +76,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return self.scope['user']
 
     def toggleOnline(self, status):
-        self.scope['user'].isOnline = status
-        self.scope['user'].save()
+        user = User.objects.get(pk=self.scope['user'].id)
+        user.isOnline = status
+        user.last_login = datetime.datetime.now()
+        user.save()
 
     async def sendMessage(self, event):
         await self.send(text_data=event['message'])

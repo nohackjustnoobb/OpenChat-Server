@@ -5,28 +5,28 @@ from .models import User, FriendRequest
 class SimpleUserSerializers(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'is_superuser', 'is_dev', 'bio', 'avatar']
+        fields = ['id', 'username', 'is_superuser', 'bio', 'avatar']
 
 
 class UserSerializers(serializers.ModelSerializer):
     class Meta:
         model = User
-        exclude = ['password', 'user_permissions', 'groups', 'friends', 'blocked', 'is_active']
+        exclude = ['password', 'user_permissions', 'groups', 'friends', 'blocked', 'is_active', 'date_joined']
 
 
 class FriendRequestSerializers(serializers.ModelSerializer):
-    fromUser = SimpleUserSerializers(read_only=True)
-    toUser = SimpleUserSerializers(read_only=True)
-
     class Meta:
         model = FriendRequest
         fields = '__all__'
 
 
 class FriendsAndBlockedSerializers(serializers.ModelSerializer):
-    friends = SimpleUserSerializers(many=True, read_only=True)
-    blocked = SimpleUserSerializers(many=True, read_only=True)
-    friendRequest = FriendRequestSerializers(many=True, read_only=True)
+    friendRequest = serializers.SerializerMethodField(required=False)
+
+    def get_friendRequest(self, obj):
+        friendRequestsList = FriendRequest.objects.filter(toUser=obj) | FriendRequest.objects.filter(fromUser=obj)
+        serializer = FriendRequestSerializers(friendRequestsList, many=True)
+        return serializer.data
 
     class Meta:
         model = User

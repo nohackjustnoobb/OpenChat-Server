@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 import re
+from chat.views import sendMessageToConsumers
 
 
 # password validation
@@ -48,6 +49,21 @@ class UserViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
+        search = request.query_params.get('search')
+        if search:
+            try:
+                search = int(search)
+                try:
+                    user = User.objects.get(pk=search)
+                    serializer = SimpleUserSerializers(user)
+                    return Response([serializer.data], status=status.HTTP_200_OK)
+                except User.DoesNotExist:
+                    return Response([], status=status.HTTP_200_OK)
+            except ValueError:
+                serializer = SimpleUserSerializers(
+                    User.objects.filter(username__icontains=search), many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
         # only admin allow to list all user
         if request.user.is_superuser:
             serializer = UserSerializers(self.queryset, many=True)
@@ -127,6 +143,8 @@ class FriendsAndBlockedViewSet(viewsets.ViewSet):
         friend = get_object_or_404(user.friends.all(), pk=pk)
         user.friends.remove(friend)
         friend.friends.remove(user)
+        sendMessageToConsumers(friend.id, {'relationship': FriendsAndBlockedSerializers(friend).data})
+        sendMessageToConsumers(user.id, {'relationship': FriendsAndBlockedSerializers(user).data})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -136,11 +154,6 @@ class CreateFriendsRequest(APIView):
 
     def post(self, request, pk=None):
         user = request.user
-        # try to get message for friend request
-        try:
-            message = request.data['message']
-        except KeyError:
-            message = ''
         # user can't make friend request to themselves
         if user.id == pk:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -159,7 +172,9 @@ class CreateFriendsRequest(APIView):
                 if requestMade:
                     # if user already made friends request, return the request user made before
                     return Response(FriendRequestSerializers(requestMade[0]).data, status=status.HTTP_400_BAD_REQUEST)
-                requestCreated = FriendRequest.objects.create(toUser=toUser, fromUser=user, message=message)
+                requestCreated = FriendRequest.objects.create(toUser=toUser, fromUser=user)
+                sendMessageToConsumers(toUser.id, {'relationship': FriendsAndBlockedSerializers(toUser).data})
+                sendMessageToConsumers(user.id, {'relationship': FriendsAndBlockedSerializers(user).data})
                 serializer = FriendRequestSerializers(requestCreated)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -190,14 +205,16 @@ class FriendRequestViewSets(viewsets.ViewSet):
         # try to get reply
         try:
             reply = request.query_params['reply']
+            fromUser = friendRequest.fromUser
+            toUser = friendRequest.toUser
             if reply == 'accept':
-                fromUser = friendRequest.fromUser
-                toUser = friendRequest.toUser
                 toUser.friends.add(fromUser)
                 fromUser.friends.add(toUser)
             elif reply != 'decline':
                 return Response(status=status.HTTP_400_BAD_REQUEST)
             friendRequest.delete()
+            sendMessageToConsumers(toUser.id, {'relationship': FriendsAndBlockedSerializers(toUser).data})
+            sendMessageToConsumers(fromUser.id, {'relationship': FriendsAndBlockedSerializers(fromUser).data})
             return Response(status=status.HTTP_202_ACCEPTED)
         except KeyError:
             # if there are not query params return the request
@@ -207,7 +224,11 @@ class FriendRequestViewSets(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         friendRequest = get_object_or_404(self.queryset, pk=pk)
         self.check_object_permissions(self.request, friendRequest)
+        toUser = friendRequest.toUser
+        fromUser = friendRequest.fromUser
         friendRequest.delete()
+        sendMessageToConsumers(toUser.id, {'relationship': FriendsAndBlockedSerializers(toUser).data})
+        sendMessageToConsumers(fromUser.id, {'relationship': FriendsAndBlockedSerializers(fromUser).data})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -218,15 +239,26 @@ class BlockOrUnBlockUser(APIView):
     def get(self, request, pk=None):
         user = request.user
         blockedUser = get_object_or_404(self.queryset, pk=pk)
+        try:
+            FriendRequest.objects.get(fromUser=blockedUser).delete()
+        except FriendRequest.DoesNotExist:
+            try:
+                FriendRequest.objects.get(toUser=blockedUser).delete()
+            except FriendRequest.DoesNotExist:
+                pass
         user.friends.remove(blockedUser)
         blockedUser.friends.remove(user)
         user.blocked.add(blockedUser)
+        sendMessageToConsumers(user.id, {'relationship': FriendsAndBlockedSerializers(user).data})
+        sendMessageToConsumers(blockedUser.id, {'relationship': FriendsAndBlockedSerializers(blockedUser).data})
         return Response(status=status.HTTP_200_OK)
 
     def delete(self, request, pk=None):
         user = request.user
         blockedUser = get_object_or_404(user.blocked.all(), pk=pk)
         user.blocked.remove(blockedUser)
+        sendMessageToConsumers(user.id, {'relationship': FriendsAndBlockedSerializers(user).data})
+        sendMessageToConsumers(blockedUser.id, {'relationship': FriendsAndBlockedSerializers(blockedUser).data})
         return Response(status=status.HTTP_200_OK)
 
 

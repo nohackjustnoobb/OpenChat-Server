@@ -110,7 +110,7 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 log.affectedUser.add(*addMembersList)
                 for groupMember in addMembersList:
                     sendMessageToConsumers(groupMember.id,
-                                           {'groupAdd': group.id, 'group': [GroupSerializers(group).data]})
+                                           {'group': [GroupSerializers(group).data]})
                 group.logs.add(log)
                 for groupMember in group.members.all():
                     sendLogToConsumers(groupMember.id, group.id, log)
@@ -194,7 +194,6 @@ class CreateGroup(APIView):
         try:
             groupName = request.data['groupName']
             owner = request.user
-            description = request.data.get('description')
             avatar = request.data.get('avatar')
             members = request.data['members']
 
@@ -205,15 +204,11 @@ class CreateGroup(APIView):
                 if membersLists.count() != len(members):
                     return Response(status=status.HTTP_404_NOT_FOUND)
 
-            if not description:
-                description = ''
-
-            groupCreated = Group.objects.create(groupName=groupName, owner=owner, isDM=False, description=description,
-                                                avatar=avatar)
+            groupCreated = Group.objects.create(groupName=groupName, owner=owner, isDM=False, avatar=avatar)
             groupCreated.members.add(owner, *membersLists)
             serializer = GroupSerializers(groupCreated)
             for groupMember in groupCreated.members.all():
-                sendMessageToConsumers(groupMember.id, {'groupAdd': groupCreated.id, 'group': [serializer.data]})
+                sendMessageToConsumers(groupMember.id, {'group': [serializer.data]})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -273,6 +268,8 @@ class CreateDM(APIView):
                 DMCreated.members.add(user, userFriend)
                 DMCreated.groupAdmins.add(user, userFriend)
                 serializer = DMSerializers(DMCreated)
+                sendMessageToConsumers(userFriend.id, {'group': [serializer.data]})
+                sendMessageToConsumers(user.id, {'group': [serializer.data]})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -311,12 +308,12 @@ class MessageViewSets(viewsets.ViewSet):
                 maxResult = int(maxResult)
                 if startMessage:
                     startMessage = int(startMessage)
-                    serializer = MessageSerializers(group.messages.all()[startMessage:maxResult + startMessage],
-                                                    many=True)
+                    serializer = MessageSerializers(
+                        group.messages.order_by('-id')[startMessage:maxResult + startMessage], many=True)
                 else:
                     raise TypeError
             except TypeError:
-                serializer = MessageSerializers(group.messages.all()[:maxResult], many=True)
+                serializer = MessageSerializers(group.messages.order_by('-id')[:maxResult], many=True)
         else:
             messagesList = group.messages.exclude(memberRead__in=[request.user.id])
             serializer = MessageSerializers(messagesList, many=True)

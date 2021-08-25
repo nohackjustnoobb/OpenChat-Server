@@ -18,7 +18,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(_('email address'), unique=True)
     username = models.CharField(_('username'), max_length=150, unique=True, validators=[UnicodeUsernameValidator])
     is_active = models.BooleanField(default=True)
-    is_dev = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     bio = models.TextField(max_length=500, blank=True)
     avatar = models.ImageField(upload_to='media/avatars/', null=True, blank=True, validators=[maxAvatarSize])
@@ -39,7 +38,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 class FriendRequest(models.Model):
     fromUser = models.ForeignKey(User, related_name='fromUser', on_delete=models.CASCADE, null=True)
     toUser = models.ForeignKey(User, related_name='toUser', on_delete=models.CASCADE, null=True)
-    message = models.TextField(max_length=500, blank=True)
     requestDate = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
