@@ -213,8 +213,10 @@ class FriendRequestViewSets(viewsets.ViewSet):
             elif reply != 'decline':
                 return Response(status=status.HTTP_400_BAD_REQUEST)
             friendRequest.delete()
-            sendMessageToConsumers(toUser.id, {'relationship': FriendsAndBlockedSerializers(toUser).data})
-            sendMessageToConsumers(fromUser.id, {'relationship': FriendsAndBlockedSerializers(fromUser).data})
+            sendMessageToConsumers(toUser.id, {'relationship': FriendsAndBlockedSerializers(toUser).data,
+                                               'users': [UserSerializers(fromUser).data]})
+            sendMessageToConsumers(fromUser.id, {'relationship': FriendsAndBlockedSerializers(fromUser).data,
+                                                 'users': [UserSerializers(toUser).data]})
             return Response(status=status.HTTP_202_ACCEPTED)
         except KeyError:
             # if there are not query params return the request

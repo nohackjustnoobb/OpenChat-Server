@@ -21,10 +21,6 @@ def sendMessageToConsumers(userID, message):
     async_to_sync(channel_layer.group_send)(str(userID), {'type': 'sendMessage', 'message': json.dumps(message)})
 
 
-def sendLogToConsumers(userID, groupID, log):
-    sendMessageToConsumers(userID, {'groupLog': {'group': groupID, 'log': ModifyLogSerializers(log).data}})
-
-
 class AdminOrIsGroupAdminOrIsGroupMemberReadOnlyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return request.user.is_superuser or request.user == obj.owner or request.user in obj.groupAdmins.all() or (
@@ -63,7 +59,7 @@ class GroupViewSets(viewsets.ViewSet):
         group = get_object_or_404(self.queryset, pk=pk)
         updateData = request.data
         self.check_object_permissions(request, group)
-        allowUpdate = ['groupName', 'description', 'avatar']
+        allowUpdate = ['groupName', 'avatar']
         filteredData = {}
         for key, value in updateData.items():
             if key in allowUpdate:
@@ -74,8 +70,8 @@ class GroupViewSets(viewsets.ViewSet):
             log = ModifyLog.objects.create(modifyUser=request.user, action='ic')
             group.logs.add(log)
             for groupMember in group.members.all():
-                sendMessageToConsumers(groupMember.id, {'group': [serializer.data]})
-                sendLogToConsumers(groupMember.id, group.id, log)
+                sendMessageToConsumers(groupMember.id,
+                                       {'group': [GroupSerializers(group).data]})
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -108,12 +104,10 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 serializer = SimpleUserSerializers(group.members.all(), many=True)
                 log = ModifyLog.objects.create(modifyUser=user, action='ma')
                 log.affectedUser.add(*addMembersList)
-                for groupMember in addMembersList:
+                for groupMember in group.members.all():
                     sendMessageToConsumers(groupMember.id,
                                            {'group': [GroupSerializers(group).data]})
                 group.logs.add(log)
-                for groupMember in group.members.all():
-                    sendLogToConsumers(groupMember.id, group.id, log)
                 return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -129,6 +123,9 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 group.logs.add(log)
                 if kickMember in group.groupAdmins.all():
                     group.groupAdmins.remove(kickMember)
+                for groupMember in group.members.all():
+                    sendMessageToConsumers(groupMember.id,
+                                           {'group': [GroupSerializers(group).data]})
                 return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -158,6 +155,9 @@ class GroupAdminsViewSets(viewsets.ViewSet):
                 log = ModifyLog.objects.create(modifyUser=request.user, action='aa')
                 log.affectedUser.add(*addAdminsList)
                 group.logs.add(log)
+                for groupMember in group.members.all():
+                    sendMessageToConsumers(groupMember.id,
+                                           {'group': [GroupSerializers(group).data]})
                 return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -170,6 +170,9 @@ class GroupAdminsViewSets(viewsets.ViewSet):
             log = ModifyLog.objects.create(modifyUser=request.user, action='ar')
             log.affectedUser.add(removeAdmin)
             group.logs.add(log)
+            for groupMember in group.members.all():
+                sendMessageToConsumers(groupMember.id,
+                                       {'group': [GroupSerializers(group).data]})
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
@@ -268,8 +271,8 @@ class CreateDM(APIView):
                 DMCreated.members.add(user, userFriend)
                 DMCreated.groupAdmins.add(user, userFriend)
                 serializer = DMSerializers(DMCreated)
-                sendMessageToConsumers(userFriend.id, {'group': [serializer.data]})
-                sendMessageToConsumers(user.id, {'group': [serializer.data]})
+                sendMessageToConsumers(userFriend.id, {'group': [GroupSerializers(DMCreated).data]})
+                sendMessageToConsumers(user.id, {'group': [GroupSerializers(DMCreated).data]})
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
