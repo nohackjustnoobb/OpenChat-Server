@@ -16,7 +16,7 @@ def maxAvatarSize(value):
 
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(_('email address'), unique=True)
-    username = models.CharField(_('username'), max_length=150, unique=True, validators=[UnicodeUsernameValidator])
+    username = models.CharField(_('username'), max_length=20, unique=True, validators=[UnicodeUsernameValidator])
     is_active = models.BooleanField(default=True)
     date_joined = models.DateTimeField(default=timezone.now)
     bio = models.TextField(max_length=500, blank=True)

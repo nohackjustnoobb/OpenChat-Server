@@ -68,7 +68,7 @@ class Message(models.Model):
     additionImage = models.ImageField(upload_to='media/images/', blank=True, validators=[maxImageSize])
     memberRead = models.ManyToManyField(User, related_name='MemberRead')
     deleted = models.BooleanField(default=False)
-    relyTo = models.ForeignKey('Message', on_delete=models.SET_NULL, blank=True, null=True)
+    replyTo = models.ForeignKey('Message', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
         return f'Message from {self.owner.username}'

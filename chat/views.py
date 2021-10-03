@@ -48,7 +48,7 @@ class GroupViewSets(viewsets.ViewSet):
         user = request.user
         group = get_object_or_404(self.queryset, pk=pk)
         if group.owner == user or user.is_superuser:
-            for groupMember in group.members.all():
+            for groupMember in group.members.filter(isOnline=True):
                 sendMessageToConsumers(groupMember.id, {'groupDeleted': group.id})
             group.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -69,10 +69,10 @@ class GroupViewSets(viewsets.ViewSet):
             serializer.save()
             log = ModifyLog.objects.create(modifyUser=request.user, action='ic')
             group.logs.add(log)
-            for groupMember in group.members.all():
+            for groupMember in group.members.filter(isOnline=True):
                 sendMessageToConsumers(groupMember.id,
                                        {'group': [GroupSerializers(group).data]})
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+            return Response(GroupSerializers(group).data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -104,7 +104,7 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 serializer = SimpleUserSerializers(group.members.all(), many=True)
                 log = ModifyLog.objects.create(modifyUser=user, action='ma')
                 log.affectedUser.add(*addMembersList)
-                for groupMember in group.members.all():
+                for groupMember in group.members.filter(isOnline=True):
                     sendMessageToConsumers(groupMember.id,
                                            {'group': [GroupSerializers(group).data]})
                 group.logs.add(log)
@@ -123,7 +123,7 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 group.logs.add(log)
                 if kickMember in group.groupAdmins.all():
                     group.groupAdmins.remove(kickMember)
-                for groupMember in group.members.all():
+                for groupMember in group.member.filter(isOnline=True):
                     sendMessageToConsumers(groupMember.id,
                                            {'group': [GroupSerializers(group).data]})
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -155,7 +155,7 @@ class GroupAdminsViewSets(viewsets.ViewSet):
                 log = ModifyLog.objects.create(modifyUser=request.user, action='aa')
                 log.affectedUser.add(*addAdminsList)
                 group.logs.add(log)
-                for groupMember in group.members.all():
+                for groupMember in group.members.filter(isOnline=True):
                     sendMessageToConsumers(groupMember.id,
                                            {'group': [GroupSerializers(group).data]})
                 return Response(serializer.data, status=status.HTTP_200_OK)
@@ -170,7 +170,7 @@ class GroupAdminsViewSets(viewsets.ViewSet):
             log = ModifyLog.objects.create(modifyUser=request.user, action='ar')
             log.affectedUser.add(removeAdmin)
             group.logs.add(log)
-            for groupMember in group.members.all():
+            for groupMember in group.members.filter(isOnline=True):
                 sendMessageToConsumers(groupMember.id,
                                        {'group': [GroupSerializers(group).data]})
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -198,7 +198,7 @@ class CreateGroup(APIView):
             groupName = request.data['groupName']
             owner = request.user
             avatar = request.data.get('avatar')
-            members = request.data['members']
+            members = request.data['members'].split(',')
 
             if not len(members) or type(members) != list or owner.id in members or not len(groupName):
                 raise KeyError
@@ -210,7 +210,7 @@ class CreateGroup(APIView):
             groupCreated = Group.objects.create(groupName=groupName, owner=owner, isDM=False, avatar=avatar)
             groupCreated.members.add(owner, *membersLists)
             serializer = GroupSerializers(groupCreated)
-            for groupMember in groupCreated.members.all():
+            for groupMember in groupCreated.members.filter(isOnline=True):
                 sendMessageToConsumers(groupMember.id, {'group': [serializer.data]})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except KeyError:
@@ -341,7 +341,11 @@ class MessageViewSets(viewsets.ViewSet):
             message.content = ''
             message.additionFile = None
             message.additionImage = None
+            message.replyTo = None
             message.save()
+            serializer = MessageSerializers(message)
+            for groupMember in group.members.filter(isOnline=True):
+                sendMessageToConsumers(groupMember.id, {'message': {group.id: serializer.data}})
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({"detail": "You do not have permission to perform this action."},
                         status=status.HTTP_403_FORBIDDEN)
@@ -353,21 +357,22 @@ class MessageViewSets(viewsets.ViewSet):
         additionFile = messageData.get('additionFile')
         additionImage = messageData.get('additionImage')
         content = messageData.get('content')
-        relyTo = messageData.get('relyTo')
+        replyTo = messageData.get('replyTo')
         if additionImage or additionFile or content:
-            if relyTo:
-                relyTo = get_object_or_404(group.messages.all(), pk=relyTo)
+            try:
+                replyTo = int(replyTo)
+                replyTo = get_object_or_404(group.messages.all(), pk=replyTo)
+            except ValueError and TypeError:
+                replyTo = None
             messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
-                                                    additionImage=additionImage, content=content, relyTo=relyTo)
+                                                    additionImage=additionImage, content=content, replyTo=replyTo)
             messageCreated.memberRead.add(request.user)
             group.messages.add(messageCreated)
             group.lastMessage = messageCreated
             group.save()
             serializer = MessageSerializers(messageCreated)
-            for groupMember in group.members.all():
-                sendMessageToConsumers(groupMember.id, {'message': {group.id: serializer.data},
-                                                        'group': [GroupSerializers(group, context={
-                                                            'user': groupMember}).data]})
+            for groupMember in group.members.filter(isOnline=True):
+                sendMessageToConsumers(groupMember.id, {'message': {group.id: serializer.data}})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 

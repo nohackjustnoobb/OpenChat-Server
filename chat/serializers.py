@@ -13,11 +13,11 @@ class ChoicesSerializerField(serializers.SerializerMethodField):
 class SimpleMessageSerializers(serializers.ModelSerializer):
     class Meta:
         model = Message
-        exclude = ['relyTo', 'memberRead']
+        exclude = ['replyTo', 'memberRead']
 
 
 class MessageReadSerializers(serializers.ModelSerializer):
-    relyTo = SimpleMessageSerializers(read_only=True)
+    replyTo = SimpleMessageSerializers(read_only=True)
 
     class Meta:
         model = Message
@@ -25,7 +25,7 @@ class MessageReadSerializers(serializers.ModelSerializer):
 
 
 class MessageSerializers(serializers.ModelSerializer):
-    relyTo = SimpleMessageSerializers(read_only=True)
+    replyTo = SimpleMessageSerializers(read_only=True)
 
     class Meta:
         model = Message

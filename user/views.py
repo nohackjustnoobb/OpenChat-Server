@@ -124,7 +124,7 @@ class MyInfo(APIView):
                         return Response({'error': password_check_result[1]}, status=status.HTTP_400_BAD_REQUEST)
                 finally:
                     serializer.save()
-                    return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+                    return Response(UserSerializers(user).data, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
