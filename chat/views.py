@@ -395,6 +395,8 @@ class PinnedMessageViewSet(viewsets.ViewSet):
         serializer = MessageSerializers(pinMessage)
         log = ModifyLog.objects.create(modifyUser=request.user, action='pm')
         group.logs.add(log)
+        for groupMember in group.members.filter(isOnline=True):
+            sendMessageToConsumers(groupMember.id, {'pinMessage': {group.id: MessageSerializers(pinMessage).data}})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None, messagePK=None):
@@ -404,4 +406,6 @@ class PinnedMessageViewSet(viewsets.ViewSet):
         group.pinnedMessages.remove(pinnedMessage)
         log = ModifyLog.objects.create(modifyUser=request.user, action='rp')
         group.logs.add(log)
+        for groupMember in group.members.filter(isOnline=True):
+            sendMessageToConsumers(groupMember.id, {'pinMessage': {group.id: MessageSerializers(pinnedMessage).data}})
         return Response(status=status.HTTP_204_NO_CONTENT)

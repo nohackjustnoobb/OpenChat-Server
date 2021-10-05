@@ -26,6 +26,10 @@ class MessageReadSerializers(serializers.ModelSerializer):
 
 class MessageSerializers(serializers.ModelSerializer):
     replyTo = SimpleMessageSerializers(read_only=True)
+    pinned = serializers.SerializerMethodField(required=False)
+
+    def get_pinned(self, obj):
+        return obj.pinnedMessages.all().exists()
 
     class Meta:
         model = Message

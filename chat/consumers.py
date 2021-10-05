@@ -9,6 +9,7 @@ from user.serializers import UserSerializers, SimpleUserSerializers, FriendsAndB
 from chat.serializers import GroupSerializers
 from chat.models import Group
 from user.models import User
+import pytz
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -20,6 +21,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await database_sync_to_async(self.toggleOnline)(False)
         if self.scope['user'].is_authenticated:
             await self.channel_layer.group_discard(str(self.scope['user'].id), self.channel_name)
+            await self.channel_layer.group_send('track_' + str(self.scope['user'].id), {'type': 'sendMessage',
+                                                                                        'message': json.dumps(
+                                                                                            {'status': {
+                                                                                                self.scope['user'].id: {
+                                                                                                    'isOnline': False,
+                                                                                                    'last_login': datetime.datetime.now(
+                                                                                                        datetime.timezone(
+                                                                                                            datetime.timedelta(
+                                                                                                                hours=+9))).isoformat()}}})})
 
     async def receive(self, text_data):
         jsonData = json.loads(text_data)
@@ -38,6 +48,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     relationship = await self.getUserRelationship()
                     await self.send(text_data=json.dumps({'yourInfo': UserSerializers(user).data,
                                                           'group': groupsList, 'relationship': relationship}))
+                    await self.channel_layer.group_send('track_' + str(user.id), {'type': 'sendMessage',
+                                                                                  'message': json.dumps({'status': {
+                                                                                      user.id: {'isOnline': True,
+                                                                                                'last_login': datetime.datetime.now(
+                                                                                                    datetime.timezone(
+                                                                                                        datetime.timedelta(
+                                                                                                            hours=+9))).isoformat()}}})})
                 else:
                     await self.send(text_data=json.dumps({'error': 'Token is not valid'}))
 
@@ -46,6 +63,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if self.scope['user'].is_authenticated and getUsers:
             usersList = await self.getUserInfo(getUsers)
             await self.send(text_data=json.dumps({'users': usersList}))
+
+        # Track User Status
+        trackUser = jsonData.get('track')
+        if trackUser:
+            if trackUser['discard']:
+                await self.channel_layer.group_discard('track_' + str(trackUser['id']), self.channel_name)
+            await self.channel_layer.group_add('track_' + str(trackUser['id']), self.channel_name)
 
     @database_sync_to_async
     def getUserInfo(self, users):
@@ -78,7 +102,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def toggleOnline(self, status):
         user = User.objects.get(pk=self.scope['user'].id)
         user.isOnline = status
-        user.last_login = datetime.datetime.now()
+        user.last_login = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=+9)))
         user.save()
 
     async def sendMessage(self, event):
