@@ -14,16 +14,16 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path, include
-from rest_framework.authtoken import views
 from .ServerInfo import ServerInfoView
 from django.conf import settings
 from django.conf.urls.static import static
+from user.views import ObtainToken
 
 urlpatterns = [
     path('', ServerInfoView.as_view()),
     path('', include('chat.urls')),
     path('user/', include('user.urls')),
-    path('token/', views.obtain_auth_token)
+    path('token/', ObtainToken.as_view())
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

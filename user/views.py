@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 import re
 from chat.views import sendMessageToConsumers
+from rest_framework.authtoken.models import Token
 
 
 # password validation
@@ -297,3 +298,20 @@ class CreateUser(APIView):
                         return Response(UserSerializers(user).data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response({'error': 'Missing username, password or email'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ObtainToken(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, format=None):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        if email and password:
+            user = get_object_or_404(User.objects.all(), email=email)
+            if user.check_password(password):
+                token = Token.objects.get_or_create(user=user)[0]
+                return Response({'token': token.key}, status=status.HTTP_200_OK)
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
