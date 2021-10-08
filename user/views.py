@@ -1,16 +1,17 @@
 import json
 from .serializers import UserSerializers, FriendsAndBlockedSerializers, SimpleUserSerializers, FriendRequestSerializers
-from .models import User, FriendRequest
+from .models import User, FriendRequest, Activate
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 import re
 from chat.views import sendMessageToConsumers
 from rest_framework.authtoken.models import Token
+from django.core.mail import send_mail
 
 
 # password validation
@@ -265,7 +266,17 @@ class BlockOrUnBlockUser(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-# todo: email validation
+def sendActivateEmail(host, user, activation=None):
+    activation = Activate.objects.get(user=user) if not activation else activation
+    send_mail(
+        'OpenChat - Active your account',
+        f'Dear {user.username}, \n\nThank you for your registration! \n\nPlease click on the link below to complete the verification and user registration: \n\n{host}/user/activate/{activation.UUID}/\n\nThanks,\nOpenChat',
+        None,
+        [user.email],
+        fail_silently=True,
+    )
+
+
 class CreateUser(APIView):
     permission_classes = [AllowAny]
 
@@ -278,24 +289,21 @@ class CreateUser(APIView):
                 return Response({'error': 'Username, password or email can\'t be empty'},
                                 status=status.HTTP_400_BAD_REQUEST)
             password_check_result = password_check(password)
-            # check username and email is not registered
+            # check email is not registered
             try:
-                User.objects.get(username=username)
-                return Response({'error': 'This username was took by other user'},
+                User.objects.get(email=email)
+                return Response({'error': 'This email was took by other user'},
                                 status=status.HTTP_400_BAD_REQUEST)
             except User.DoesNotExist:
-                try:
-                    User.objects.get(email=email)
-                    return Response({'error': 'This email was took by other user'},
-                                    status=status.HTTP_400_BAD_REQUEST)
-                except User.DoesNotExist:
-                    if not password_check_result[0]:
-                        return Response({'error': password_check_result[1]}, status=status.HTTP_400_BAD_REQUEST)
-                    elif not email_check(email):
-                        return Response({'error': 'This email is invalid'}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        user = User.objects.create_user(username, email, password)
-                        return Response(UserSerializers(user).data, status=status.HTTP_201_CREATED)
+                if not password_check_result[0]:
+                    return Response({'error': password_check_result[1]}, status=status.HTTP_400_BAD_REQUEST)
+                elif not email_check(email):
+                    return Response({'error': 'This email is invalid'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    user = User.objects.create_user(username, email, password)
+                    activation = Activate.objects.create(user=user)
+                    sendActivateEmail(request.get_host(), user, activation)
+                    return Response(UserSerializers(user).data, status=status.HTTP_201_CREATED)
         except KeyError:
             return Response({'error': 'Missing username, password or email'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -307,7 +315,7 @@ class ObtainToken(APIView):
         email = request.data.get('email')
         password = request.data.get('password')
         if email and password:
-            user = get_object_or_404(User.objects.all(), email=email)
+            user = get_object_or_404(User.objects.filter(is_active=True), email=email)
             if user.check_password(password):
                 token = Token.objects.get_or_create(user=user)[0]
                 return Response({'token': token.key}, status=status.HTTP_200_OK)
@@ -315,3 +323,24 @@ class ObtainToken(APIView):
                 return Response(status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivateAccount(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, uuid=None):
+        activation = get_object_or_404(Activate.objects.all(), UUID=uuid)
+        user = activation.user
+        user.is_active = True
+        user.save()
+        activation.delete()
+        return render(request, 'Activated.html')
+
+    def post(self, request, uuid=None):
+        if uuid == 'resend':
+            email = request.data.get('email')
+            user = get_object_or_404(User.objects.filter(is_active=False), email=email)
+            activation = get_object_or_404(Activate.objects.all(), user=user)
+            sendActivateEmail(request.get_host(), user, activation)
+            return Response(status=status.HTTP_200_OK)
+        return Response({"detail": "Method \"POST\" not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
