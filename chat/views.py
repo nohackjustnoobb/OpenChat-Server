@@ -123,7 +123,7 @@ class GroupMembersViewSets(viewsets.ViewSet):
                 group.logs.add(log)
                 if kickMember in group.groupAdmins.all():
                     group.groupAdmins.remove(kickMember)
-                for groupMember in group.member.filter(isOnline=True):
+                for groupMember in group.members.filter(isOnline=True):
                     sendMessageToConsumers(groupMember.id,
                                            {'group': [GroupSerializers(group).data]})
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -362,7 +362,7 @@ class MessageViewSets(viewsets.ViewSet):
             try:
                 replyTo = int(replyTo)
                 replyTo = get_object_or_404(group.messages.all(), pk=replyTo)
-            except ValueError and TypeError:
+            except (ValueError, TypeError):
                 replyTo = None
             messageCreated = Message.objects.create(owner=request.user, additionFile=additionFile,
                                                     additionImage=additionImage, content=content, replyTo=replyTo)

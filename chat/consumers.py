@@ -18,8 +18,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        await database_sync_to_async(self.toggleOnline)(False)
         if self.scope['user'].is_authenticated:
+            await database_sync_to_async(self.toggleOnline)(False)
             await self.channel_layer.group_discard(str(self.scope['user'].id), self.channel_name)
             await self.channel_layer.group_send('track_' + str(self.scope['user'].id), {'type': 'sendMessage',
                                                                                         'message': json.dumps(
@@ -33,21 +33,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         jsonData = json.loads(text_data)
+        sendContent = {}
 
         # Authorization
         Authorization = jsonData.get('Authorization')
         if Authorization:
             token = Authorization.split()[1]
             if self.scope['user'].is_authenticated:
-                await self.send(text_data=json.dumps({'yourInfo': UserSerializers(self.scope['user']).data}))
+                sendContent = {**sendContent, **{'yourInfo': UserSerializers(self.scope['user']).data}}
             else:
                 user = await self.AuthorizationByToken(token)
                 if user.is_authenticated:
                     await self.channel_layer.group_add(str(user.id), self.channel_name)
                     groupsList = await self.getUserGroupAndDM()
                     relationship = await self.getUserRelationship()
-                    await self.send(text_data=json.dumps({'yourInfo': UserSerializers(user).data,
-                                                          'group': groupsList, 'relationship': relationship}))
+                    sendContent = {**sendContent, **{'yourInfo': UserSerializers(user).data,
+                                                     'group': groupsList, 'relationship': relationship}}
                     await self.channel_layer.group_send('track_' + str(user.id), {'type': 'sendMessage',
                                                                                   'message': json.dumps({'status': {
                                                                                       user.id: {'isOnline': True,
@@ -62,7 +63,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         getUsers = jsonData.get('users')
         if self.scope['user'].is_authenticated and getUsers:
             usersList = await self.getUserInfo(getUsers)
-            await self.send(text_data=json.dumps({'users': usersList}))
+            sendContent = {**sendContent, **{'users': usersList}}
 
         # Track User Status
         trackUser = jsonData.get('track')
@@ -70,6 +71,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if trackUser['discard']:
                 await self.channel_layer.group_discard('track_' + str(trackUser['id']), self.channel_name)
             await self.channel_layer.group_add('track_' + str(trackUser['id']), self.channel_name)
+
+        if sendContent:
+            await self.send(text_data=json.dumps(sendContent))
 
     @database_sync_to_async
     def getUserInfo(self, users):
